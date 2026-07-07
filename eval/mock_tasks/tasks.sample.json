@@ -14,5 +14,9 @@
   { "task_id": "logic-1", "prompt": "Three friends - Alice, Bob, and Carol - sit in a row. Alice is not on the left. Bob is directly to the right of Carol. Who sits in the middle?" },
   { "task_id": "logic-2", "prompt": "If all bloops are razzies and no razzies are lazzies, which of the following must be true: (a) some bloops are lazzies, (b) no bloops are lazzies, (c) all lazzies are bloops?" },
   { "task_id": "fact-1", "prompt": "What is photosynthesis and why is it important for life on Earth?" },
-  { "task_id": "fact-2", "prompt": "Explain the difference between RAM and ROM in a computer." }
+  { "task_id": "fact-2", "prompt": "Explain the difference between RAM and ROM in a computer." },
+  { "task_id": "det-1", "prompt": "What is 847 * 36 + 129?" },
+  { "task_id": "det-2", "prompt": "What day of the week was 2024-03-15?" },
+  { "task_id": "det-3", "prompt": "How many times does the letter 'r' appear in 'strawberry'?" },
+  { "task_id": "comp-1", "prompt": "A library book was borrowed on March 3, 2021 and is due 45 days later. On what date is it due?" }
 ]

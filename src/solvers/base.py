@@ -18,6 +18,7 @@ from src.llm.remote_llm import RemoteError, RemoteLLM
 from src.routing.budget import Budget, Mode
 from src.routing.calibration import calibrated_confidence
 from src.routing.prompt_compression import build_escalation_user
+from src.solvers.deterministic import try_deterministic
 
 _FALLBACK_ANSWER = "Unable to determine a reliable answer."
 _FEEDBACK_CAP = 600
@@ -119,10 +120,13 @@ class BaseSolver(ABC):
         t0 = time.monotonic()
         mode = self.ctx.mode()
         attempt = LocalAttempt()
-        try:
-            attempt = await self.attempt_local(task, mode)
-        except LocalError as e:
-            attempt.feedback = f"local backend error: {e}"
+
+        det = try_deterministic(task.prompt)
+        if det is None:
+            try:
+                attempt = await self.attempt_local(task, mode)
+            except LocalError as e:
+                attempt.feedback = f"local backend error: {e}"
 
         remote_ms = 0
 
@@ -147,6 +151,9 @@ class BaseSolver(ABC):
                 remote_ms=remote_ms,
                 mode=mode.value,
             )
+
+        if det is not None:
+            return done(det, Route.DETERMINISTIC, conf=1.0, detail="exact-match handler")
 
         if attempt.verified and attempt.answer:
             route = Route.LOCAL_REPAIR if attempt.repaired else Route.LOCAL

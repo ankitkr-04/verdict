@@ -13,7 +13,9 @@ _PATTERN_SCORE = 2
 _CLASSIFY_SNIPPET_CHARS = 500
 
 _CLASSIFY_USER = (
-    "Classify this task. Reply with exactly one word from: {options}.\n\nTask: {snippet}"
+    "Classify this task. Reply with exactly one word from: {options}. "
+    "Use math for anything computable: arithmetic, dates, counting, unit conversion."
+    "\n\nTask: {snippet}"
 )
 
 

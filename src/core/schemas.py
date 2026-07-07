@@ -20,6 +20,7 @@ class Category(StrEnum):
 class Route(StrEnum):
     """How a task's final answer was produced."""
 
+    DETERMINISTIC = "deterministic"  # pure-Python exact-match handler, no LLM at all
     LOCAL = "local"                # local answer passed verification
     LOCAL_REPAIR = "local_repair"  # passed after a repair round
     LOCAL_UNVERIFIED = "local_unverified"  # accepted without full verification (panic/degraded)

@@ -27,16 +27,28 @@ defaults:
     max_tokens: 200
 
 categories:
+  # The PAL lane: anything computable — arithmetic, dates, counting, conversions,
+  # string ops — routes here. The LLM only translates English to Python; the sandboxed
+  # executor computes the answer, so the model never does mental arithmetic or
+  # calendar math (its weakest skills).
   math:
     dispatch:
       keywords: [calculate, compute, sum, total, average, percent, percentage, profit,
-                 interest, price, cost, speed, distance, probability, ratio, fraction]
-      patterns: ['\d+\s*%', '\d+\s*[+\-*/^]\s*\d+', 'how (?:many|much)', '\bif .*\d+.*\bhow\b']
+                 interest, price, cost, speed, distance, probability, ratio, fraction,
+                 convert, conversion, celsius, fahrenheit, kilometers, miles, liters,
+                 gallons, ounces, kilograms]
+      patterns: ['\d+\s*%', '\d+\s*[+\-*/^]\s*\d+', 'how (?:many|much)', '\bif .*\d+.*\bhow\b',
+                 'day of the week', 'how many days .*between', '\d+\s*days?\s*(?:after|before|from|later)',
+                 'what date', 'convert .*\d.* to', 'how many (?:letters|vowels|consonants|characters|words|times)',
+                 'reverse (?:the )?(?:string|word|letters)', 'spelled backwards?', 'alphabetical order']
     solver: math
     verifier: pyexec_math
     prompt:
       system: >-
-        You solve math problems by writing Python. Output ONLY a fenced python code block.
+        You solve computational problems (arithmetic, word problems, dates and calendars,
+        unit conversion, counting letters or words, string manipulation) by writing Python.
+        Never compute in your head — always let the code compute. Use the datetime module
+        for any date or weekday question. Output ONLY a fenced python code block.
         The code must be self-contained, use only the standard library, and end with a
         single print() of the final answer.
       user: "{prompt}"
