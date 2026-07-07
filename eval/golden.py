@@ -31,6 +31,7 @@ def main() -> int:
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     results_path = OUT_DIR / "results.json"
     ledger_path = OUT_DIR / "run.ledger.jsonl"
+    metrics_path = OUT_DIR / "run.metrics.json"
 
     env = os.environ.copy()
     env.setdefault("VERDICT_LOCAL_BACKEND", "llama" if args.real_local else "mock")
@@ -38,6 +39,7 @@ def main() -> int:
     env["VERDICT_INPUT"] = str(args.tasks)
     env["VERDICT_OUTPUT"] = str(results_path)
     env["VERDICT_LEDGER"] = str(ledger_path)
+    env["VERDICT_METRICS"] = str(metrics_path)
 
     proc = subprocess.run([sys.executable, "main.py"], cwd=REPO_ROOT, env=env)
 
@@ -66,6 +68,13 @@ def main() -> int:
                 remote_calls += json.loads(line).get("remote_calls", 0)
     if remote_calls < 1:
         failures.append("no Fireworks/remote call was recorded (AMD-usage rule)")
+
+    try:
+        m = json.loads(metrics_path.read_text(encoding="utf-8"))
+        if m.get("status") != "complete":
+            failures.append(f"metrics status is {m.get('status')!r}, not 'complete'")
+    except (OSError, json.JSONDecodeError) as e:
+        failures.append(f"run.metrics.json unreadable/invalid: {e!r}")
 
     if failures:
         print("GOLDEN RUN FAILED:")

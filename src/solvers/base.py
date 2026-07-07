@@ -44,6 +44,9 @@ class LocalAttempt:
     feedback: str = ""          # why verification failed (ledger detail / escalation reason)
     local_calls: int = 0
     best_logprob: float | None = None
+    local_prompt_tokens: int = 0
+    local_completion_tokens: int = 0
+    local_ms: int = 0
 
 
 class BaseSolver(ABC):
@@ -65,6 +68,7 @@ class BaseSolver(ABC):
     ) -> LLMResponse:
         p = self.policy
         suffix = "" if p.thinking else self.ctx.local.no_think_suffix
+        t0 = time.monotonic()
         resp = await self.ctx.local.generate(
             p.system if system is None else system,
             user + suffix,
@@ -72,7 +76,10 @@ class BaseSolver(ABC):
             max_tokens=p.max_tokens if max_tokens is None else max_tokens,
             stop=stop,
         )
+        attempt.local_ms += int((time.monotonic() - t0) * 1000)
         attempt.local_calls += 1
+        attempt.local_prompt_tokens += resp.prompt_tokens
+        attempt.local_completion_tokens += resp.completion_tokens
         if resp.mean_logprob is not None:
             best = attempt.best_logprob
             attempt.best_logprob = resp.mean_logprob if best is None else max(best, resp.mean_logprob)
@@ -117,6 +124,8 @@ class BaseSolver(ABC):
         except LocalError as e:
             attempt.feedback = f"local backend error: {e}"
 
+        remote_ms = 0
+
         def done(answer: str, route: Route, *, conf: float, rpt: int = 0, rct: int = 0,
                  rcalls: int = 0, detail: str = "") -> SolveResult:
             return SolveResult(
@@ -132,6 +141,11 @@ class BaseSolver(ABC):
                 wall_ms=int((time.monotonic() - t0) * 1000),
                 detail=detail,
                 best_logprob=attempt.best_logprob,
+                local_prompt_tokens=attempt.local_prompt_tokens,
+                local_completion_tokens=attempt.local_completion_tokens,
+                local_ms=attempt.local_ms,
+                remote_ms=remote_ms,
+                mode=mode.value,
             )
 
         if attempt.verified and attempt.answer:
@@ -140,12 +154,14 @@ class BaseSolver(ABC):
 
         # Verified local failure (or nothing verifiable) -> the only paid path.
         user = build_escalation_user(task.prompt, self.policy.escalate.instruction)
+        t_remote = time.monotonic()
         try:
             resp = await self.ctx.remote.complete(
                 user,
                 max_tokens=self.policy.escalate.max_tokens,
                 temperature=self.policy.escalate.temperature,
             )
+            remote_ms = int((time.monotonic() - t_remote) * 1000)
             answer = self.post_remote(task, resp.text)
             if answer:
                 return done(
@@ -161,6 +177,7 @@ class BaseSolver(ABC):
                 detail="remote returned empty text",
             )
         except RemoteError as e:
+            remote_ms = int((time.monotonic() - t_remote) * 1000)
             return done(
                 attempt.answer or _FALLBACK_ANSWER, Route.REMOTE_FAILED,
                 conf=attempt.confidence, detail=f"{attempt.feedback} | {e}",

@@ -70,3 +70,12 @@ class SolveResult:
     wall_ms: int = 0
     detail: str = ""
     best_logprob: float | None = None  # raw signal for offline Platt calibration
+    # ---- telemetry (ledger/metrics; free to collect, feeds the future dashboard) ----
+    local_prompt_tokens: int = 0      # zero-cost tokens consumed locally
+    local_completion_tokens: int = 0
+    local_ms: int = 0                 # time spent inside local generations
+    remote_ms: int = 0                # time spent inside the remote call
+    dispatch_ms: int = 0              # classification time (set by orchestrator)
+    queue_ms: int = 0                 # wait for a concurrency slot (set by orchestrator)
+    mode: str = ""                    # budget mode (full/reduced/panic) when solved
+    finished_s: float = 0.0           # run-clock seconds at completion (timeline plots)

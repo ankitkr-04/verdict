@@ -35,6 +35,7 @@ def _env_float(name: str, default: float) -> float:
 INPUT_TASKS_PATH = Path(_env("VERDICT_INPUT", "/input/tasks.json"))
 OUTPUT_RESULTS_PATH = Path(_env("VERDICT_OUTPUT", "/output/results.json"))
 LEDGER_PATH = Path(_env("VERDICT_LEDGER", "/tmp/verdict.ledger.jsonl"))
+METRICS_PATH = Path(_env("VERDICT_METRICS", "/tmp/verdict.metrics.json"))
 
 # ---- Local model weights (auto-downloaded when absent; Docker bakes them at build) ----
 MODEL_REPO = _env("VERDICT_MODEL_REPO", "unsloth/Qwen3.5-4B-GGUF")
