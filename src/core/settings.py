@@ -37,8 +37,8 @@ OUTPUT_RESULTS_PATH = Path(_env("VERDICT_OUTPUT", "/output/results.json"))
 LEDGER_PATH = Path(_env("VERDICT_LEDGER", "/tmp/verdict.ledger.jsonl"))
 
 # ---- Local model weights (auto-downloaded when absent; Docker bakes them at build) ----
-MODEL_REPO = _env("VERDICT_MODEL_REPO", "unsloth/Qwen3-4B-Instruct-2507-GGUF")
-MODEL_FILE = _env("VERDICT_MODEL_FILE", "Qwen3-4B-Instruct-2507-Q4_K_M.gguf")
+MODEL_REPO = _env("VERDICT_MODEL_REPO", "unsloth/Qwen3.5-4B-GGUF")
+MODEL_FILE = _env("VERDICT_MODEL_FILE", "Qwen3.5-4B-UD-Q4_K_XL.gguf")
 MODEL_DIR = Path(_env("VERDICT_MODEL_DIR", str(REPO_ROOT / "models")))
 MODEL_LINK = MODEL_DIR / "model.gguf"  # stable path llama-server is pointed at
 

@@ -9,8 +9,9 @@ local:
   timeout_s: 20
   logprobs: true
   # Appended to the user message when a category has thinking disabled.
-  # Qwen3-family soft switch; models that don't know it just ignore it.
-  no_think_suffix: " /no_think"
+  # Qwen3.5 Small ships with reasoning OFF by default, so nothing is needed.
+  # Running an older Qwen3 instead? Set this back to " /no_think".
+  no_think_suffix: "${VERDICT_NO_THINK_SUFFIX:-}"
 
 remote:
   backend: ${VERDICT_REMOTE_BACKEND:-fireworks}   # fireworks | mock
