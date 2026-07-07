@@ -1,0 +1,18 @@
+[
+  { "task_id": "math-1", "prompt": "A shop sells a jacket for $80 after a 20% discount. Calculate the original price." },
+  { "task_id": "math-2", "prompt": "If a train travels 240 km in 3 hours, how many kilometers does it travel in 5 hours at the same speed?" },
+  { "task_id": "codegen-1", "prompt": "Write a Python function called is_palindrome(s) that returns True if the string s reads the same forwards and backwards, ignoring case. Example: is_palindrome('Level') -> True" },
+  { "task_id": "codegen-2", "prompt": "Implement a function fizzbuzz(n) that returns a list of strings for 1..n where multiples of 3 are 'Fizz', multiples of 5 are 'Buzz', and multiples of both are 'FizzBuzz'." },
+  { "task_id": "debug-1", "prompt": "Fix the bug in the following code:\n```python\ndef mean(nums):\n    total = 0\n    for n in nums:\n        total += n\n    return total / len(nums) + 1\n\nprint(mean([2, 4, 6]))\n```\nExpected output: 4.0" },
+  { "task_id": "debug-2", "prompt": "The following code crashes. Fix the error:\n```python\nitems = {'a': 1, 'b': 2}\nfor key in items:\n    print(key, items[key.upper()])\n```" },
+  { "task_id": "ner-1", "prompt": "Extract the named entities (person, organization, location, date) from this sentence: 'Sundar Pichai announced that Google will open a new office in Zurich on March 5, 2026.'" },
+  { "task_id": "ner-2", "prompt": "Identify all person, organization, location and date entities: 'Marie Curie joined the University of Paris in 1906 after moving from Warsaw.'" },
+  { "task_id": "sum-1", "prompt": "Summarise the following text in one sentence: The solar panel industry has grown rapidly over the past decade. Falling production costs, government subsidies, and rising climate awareness have all contributed. Analysts expect the trend to continue as storage technology matures." },
+  { "task_id": "sum-2", "prompt": "Summarize this passage in at most 25 words: Remote work reshaped office culture. Companies downsized real estate, workers relocated to cheaper cities, and collaboration tools became essential infrastructure for daily operations across industries." },
+  { "task_id": "sent-1", "prompt": "Classify the sentiment of this review and justify your classification: 'The battery lasts forever and the screen is gorgeous. Best purchase I've made all year!'" },
+  { "task_id": "sent-2", "prompt": "What is the sentiment of the following statement? Explain briefly: 'The food was decent but the service was painfully slow and the waiter was rude.'" },
+  { "task_id": "logic-1", "prompt": "Three friends - Alice, Bob, and Carol - sit in a row. Alice is not on the left. Bob is directly to the right of Carol. Who sits in the middle?" },
+  { "task_id": "logic-2", "prompt": "If all bloops are razzies and no razzies are lazzies, which of the following must be true: (a) some bloops are lazzies, (b) no bloops are lazzies, (c) all lazzies are bloops?" },
+  { "task_id": "fact-1", "prompt": "What is photosynthesis and why is it important for life on Earth?" },
+  { "task_id": "fact-2", "prompt": "Explain the difference between RAM and ROM in a computer." }
+]
