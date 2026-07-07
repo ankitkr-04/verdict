@@ -48,6 +48,7 @@ class Ledger:
             "category": r.category.value,
             "route": r.route.value,
             "confidence": round(r.confidence, 4),
+            "mean_logprob": round(r.best_logprob, 5) if r.best_logprob is not None else None,
             "remote_calls": r.remote_calls,
             "remote_prompt_tokens": r.remote_prompt_tokens,
             "remote_completion_tokens": r.remote_completion_tokens,

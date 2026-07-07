@@ -131,6 +131,7 @@ class BaseSolver(ABC):
                 remote_calls=rcalls,
                 wall_ms=int((time.monotonic() - t0) * 1000),
                 detail=detail,
+                best_logprob=attempt.best_logprob,
             )
 
         if attempt.verified and attempt.answer:

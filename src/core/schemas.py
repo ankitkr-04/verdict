@@ -69,3 +69,4 @@ class SolveResult:
     remote_calls: int = 0
     wall_ms: int = 0
     detail: str = ""
+    best_logprob: float | None = None  # raw signal for offline Platt calibration
