@@ -1,0 +1,255 @@
+# Per-category policy: dispatch rules, local prompts, sampling, verification, escalation.
+# This file is the single place task behavior is tuned — solvers read it, never hardcode.
+#
+# Dispatch scoring: each keyword hit = +1, each regex pattern hit = +2 (word-boundary,
+# case-insensitive). Highest score wins; score < min_score -> local-LLM classify fallback.
+#
+# Local answers cost 0 tokens; local max_tokens exist only to bound wall-clock on CPU.
+# Remote max_tokens directly cap scored Fireworks completion tokens — keep tight.
+
+dispatch:
+  min_score: 2
+  llm_fallback: true          # ambiguous -> one tiny free local classification call
+  # Tie-break order when specific categories score equal (more specific wins).
+  # Factual never competes heuristically — it is the catch-all fallback.
+  priority: [code_debug, ner, summarize, sentiment, math, logic, code_gen]
+
+defaults:
+  temperature: 0.2
+  max_tokens: 384
+  n_samples: 1
+  repair_attempts: 1
+  thinking: false
+  theta: 0.55                 # calibrated-confidence floor (soft categories)
+  answer_format: "{answer}"
+  escalate:
+    temperature: 0.0
+    max_tokens: 200
+
+categories:
+  math:
+    dispatch:
+      keywords: [calculate, compute, sum, total, average, percent, percentage, profit,
+                 interest, price, cost, speed, distance, probability, ratio, fraction]
+      patterns: ['\d+\s*%', '\d+\s*[+\-*/^]\s*\d+', 'how (?:many|much)', '\bif .*\d+.*\bhow\b']
+    solver: math
+    verifier: pyexec_math
+    prompt:
+      system: >-
+        You solve math problems by writing Python. Output ONLY a fenced python code block.
+        The code must be self-contained, use only the standard library, and end with a
+        single print() of the final answer.
+      user: "{prompt}"
+      repair: |-
+        {prompt}
+
+        Your previous code:
+        ```python
+        {previous}
+        ```
+        It failed with: {feedback}
+        Output ONLY a corrected fenced python code block ending with one print() of the answer.
+    temperature: 0.2
+    max_tokens: 300
+    n_samples: 1
+    repair_attempts: 1
+    answer_format: "{answer}"
+    escalate:
+      instruction: "Give only the final numeric answer (with unit if the question uses one)."
+      max_tokens: 40
+
+  code_gen:
+    dispatch:
+      keywords: [function, implement, "write a", python, javascript, class, method,
+                 algorithm, return, parameter]
+      patterns: ['write (?:a|an|the) .*function', 'def \w+', 'implement .*(?:function|class|method)']
+    solver: code_gen
+    verifier: code_gen
+    prompt:
+      system: >-
+        You write correct, clean Python. Output ONLY one fenced python code block with the
+        requested function (plus imports if needed). No usage examples, no explanations.
+      user: "{prompt}"
+      repair: |-
+        {prompt}
+
+        Your previous code:
+        ```python
+        {previous}
+        ```
+        It failed: {feedback}
+        Output ONLY the corrected fenced python code block.
+      tests: >-
+        Read the task and the candidate function signature. Write Python assert statements
+        that check the examples given in the task (and 1-2 obvious edge cases if none given).
+        Output ONLY a fenced python code block containing assert lines. If the task gives
+        no checkable examples, output a block containing only: pass
+    temperature: 0.2
+    max_tokens: 500
+    repair_attempts: 1
+    escalate:
+      instruction: "Output only the requested function as code. No explanation."
+      max_tokens: 350
+
+  code_debug:
+    dispatch:
+      keywords: [bug, buggy, fix, debug, error, exception, traceback, incorrect, broken,
+                 "doesn't work", crashes]
+      patterns: ['fix (?:the|this) (?:bug|code|function|error)', 'why .*(?:fail|error|wrong)',
+                 'following code .*(?:bug|error|wrong|incorrect)']
+    solver: code_debug
+    verifier: code_debug
+    prompt:
+      system: >-
+        You fix bugs. Identify the bug, then output the FULL corrected code in ONE fenced
+        python code block. Before the block, state the bug in one short sentence.
+      user: "{prompt}"
+      repair: |-
+        {prompt}
+
+        Your previous fix:
+        ```python
+        {previous}
+        ```
+        It still fails: {feedback}
+        State the bug in one sentence, then output the FULL corrected code in one fenced block.
+    temperature: 0.2
+    max_tokens: 500
+    repair_attempts: 1
+    answer_format: "{answer}"
+    escalate:
+      instruction: "Identify the bug in one sentence, then give the full corrected code."
+      max_tokens: 350
+
+  ner:
+    dispatch:
+      keywords: [entities, entity, extract, "named entity", ner, "label each", identify]
+      patterns: ['extract .*(?:entities|names|people|organizations|locations|dates)',
+                 '(?:person|organization|location|date).*(?:person|organization|location|date)']
+    solver: ner
+    verifier: ner
+    entity_types: [PERSON, ORG, LOCATION, DATE]
+    agreement_f1: 0.8
+    prompt:
+      system: >-
+        You extract named entities. Output ONLY a JSON array, no prose:
+        [{"text": "<exact span from the text>", "type": "PERSON|ORG|LOCATION|DATE"}]
+      user: "{prompt}"
+      repair: |-
+        {prompt}
+
+        Your previous output:
+        {previous}
+
+        It was invalid: {feedback}
+        Output ONLY the corrected JSON array in the required schema.
+    temperature: 0.1
+    max_tokens: 400
+    n_samples: 2
+    repair_attempts: 1
+    escalate:
+      instruction: >-
+        Extract named entities as a JSON array of {"text": ..., "type": "PERSON|ORG|LOCATION|DATE"}.
+        JSON only.
+      max_tokens: 250
+
+  summarize:
+    dispatch:
+      keywords: [summarize, summarise, summary, condense, shorten, tldr, "key points"]
+      patterns: ['in (?:one|two|three|\d+) sentences?', 'in (?:under |at most )?\d+ words',
+                 'bullet points?']
+    solver: summarize
+    verifier: summary_constraints
+    prompt:
+      system: >-
+        You summarize text following the stated format and length constraints EXACTLY.
+        Output only the summary — no preamble, no quotes.
+      user: "{prompt}"
+      repair: |-
+        {prompt}
+
+        Your previous summary:
+        {previous}
+
+        Constraint violation: {feedback}
+        Rewrite the summary so it satisfies the constraint exactly. Output only the summary.
+    temperature: 0.3
+    max_tokens: 300
+    repair_attempts: 2
+    escalate:
+      instruction: "Follow the length/format constraint exactly. Output only the summary."
+      max_tokens: 200
+
+  sentiment:
+    dispatch:
+      keywords: [sentiment, positive, negative, neutral, tone, opinion, review, feeling,
+                 attitude, classify]
+      patterns: ['sentiment of', 'classify .*(?:sentiment|tone|review)',
+                 '(?:positive|negative|neutral).*(?:positive|negative|neutral)']
+    solver: sentiment
+    verifier: label_agreement
+    labels: [positive, negative, neutral, mixed]
+    prompt:
+      system: >-
+        You classify sentiment. Line 1: exactly one word — Positive, Negative, Neutral, or
+        Mixed. Line 2: a one-sentence justification citing the wording of the text.
+      user: "{prompt}"
+      repair: |-
+        {prompt}
+
+        Your previous reply was invalid: {feedback}
+        Reply again: line 1 exactly one label word, line 2 one-sentence justification.
+    temperature: 0.2
+    max_tokens: 120
+    n_samples: 2
+    repair_attempts: 1
+    escalate:
+      instruction: "Reply with the sentiment label (Positive/Negative/Neutral/Mixed) and a one-sentence justification."
+      max_tokens: 60
+
+  logic:
+    dispatch:
+      keywords: [puzzle, riddle, deduce, deduction, constraint, seating, schedule, "who is",
+                 truth, liar, "left of", "next to", older, younger, "each person"]
+      patterns: ['if .* then .*', '\b(?:alice|bob|carol|dave)\b.*\b(?:alice|bob|carol|dave)\b',
+                 'which of the following must', 'exactly one of']
+    solver: logic
+    verifier: majority
+    prompt:
+      system: >-
+        You solve logic puzzles. Reason step by step briefly, checking every stated
+        constraint. End with one line: "FINAL: <answer>".
+      user: "{prompt}"
+      repair: >-
+        Your answer violated: {feedback}
+        Re-solve carefully. End with one line: "FINAL: <answer>".
+    temperature: 0.6
+    max_tokens: 600
+    n_samples: 3
+    majority_min: 2
+    thinking: true
+    theta: 0.6
+    repair_attempts: 0
+    escalate:
+      instruction: "Solve the puzzle. Give only the final answer, one short sentence."
+      max_tokens: 80
+
+  factual:
+    # No dispatch block: factual is the catch-all when nothing specific matches.
+    solver: factual
+    verifier: factual_agreement
+    agreement_min: 0.45
+    prompt:
+      system: >-
+        Answer factual questions accurately and concisely in 1-3 sentences. If a term is
+        asked, define it directly. No filler.
+      user: "{prompt}"
+      repair: ""
+    temperature: 0.3
+    max_tokens: 220
+    n_samples: 2
+    theta: 0.6
+    repair_attempts: 0
+    escalate:
+      instruction: "Answer accurately in at most 3 sentences."
+      max_tokens: 120

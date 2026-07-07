@@ -1,0 +1,24 @@
+# Model/backend wiring. ${ENV:-default} placeholders are expanded at load time.
+# No Fireworks model IDs live here — they arrive via ALLOWED_MODELS at runtime.
+
+local:
+  backend: ${VERDICT_LOCAL_BACKEND:-llama}        # llama | mock
+  base_url: ${VERDICT_LOCAL_BASE_URL:-http://127.0.0.1:8080/v1}
+  model: local                                    # llama-server serves one model; name is cosmetic
+  slots: ${VERDICT_LOCAL_SLOTS:-4}                # must match llama-server --parallel
+  timeout_s: 20
+  logprobs: true
+  # Appended to the user message when a category has thinking disabled.
+  # Qwen3-family soft switch; models that don't know it just ignore it.
+  no_think_suffix: " /no_think"
+
+remote:
+  backend: ${VERDICT_REMOTE_BACKEND:-fireworks}   # fireworks | mock
+  # Substring preference order, matched case-insensitively against ALLOWED_MODELS.
+  # First match wins; no match -> first allowed model. Gemma first = side-prize bias.
+  prefer: ["gemma"]
+  timeout_s: 25
+  max_retries: 1
+  retry_backoff_s: 1.0
+  # Byte-identical system prefix on every remote call -> Fireworks prompt-cache discount.
+  system: "Answer directly and correctly. No preamble."

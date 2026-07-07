@@ -1,0 +1,6 @@
+{
+  "_comment": "Platt scaling per category: p = 1 / (1 + exp(A*s + B)) where s = mean token logprob of the local answer. Overwritten by eval/calibrate.py from labeled mock runs; these are conservative uncalibrated defaults. theta = minimum calibrated confidence to accept a local answer without escalation.",
+  "default": { "A": -3.0, "B": -0.5, "theta": 0.55 },
+  "factual": { "A": -3.0, "B": -0.5, "theta": 0.6 },
+  "logic":   { "A": -3.0, "B": -0.5, "theta": 0.6 }
+}
