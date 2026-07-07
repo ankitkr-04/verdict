@@ -3,6 +3,7 @@
 # are needed at submission time. These are for remote experimentation only.
 -r requirements.txt
 
+huggingface_hub   # scripts/fetch_model.py: resumable GGUF downloads
+
 # Uncomment what the remote box needs:
 # llama-cpp-python  # if driving llama.cpp from Python instead of llama-server
-# huggingface_hub   # pulling GGUF weights

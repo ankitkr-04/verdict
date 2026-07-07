@@ -18,11 +18,16 @@ RUN cmake -S /llama.cpp -B /llama.cpp/build \
         -DLLAMA_CURL=OFF \
     && cmake --build /llama.cpp/build --target llama-server -j"$(nproc)"
 
-# ---------- stage 2: model weights (config swap: override MODEL_URL at build time) ----------
+# ---------- stage 2: model weights ----------
+# Swap models with build-args, e.g.:
+#   --build-arg MODEL_REPO=unsloth/Qwen3-14B-GGUF --build-arg MODEL_FILE=Qwen3-14B-Q4_K_M.gguf
+# or override the full MODEL_URL for non-HF sources.
 FROM python:3.12-slim AS model
 RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates \
     && rm -rf /var/lib/apt/lists/*
-ARG MODEL_URL=https://huggingface.co/unsloth/Qwen3-4B-Instruct-2507-GGUF/resolve/main/Qwen3-4B-Instruct-2507-Q4_K_M.gguf
+ARG MODEL_REPO=unsloth/Qwen3-4B-Instruct-2507-GGUF
+ARG MODEL_FILE=Qwen3-4B-Instruct-2507-Q4_K_M.gguf
+ARG MODEL_URL=https://huggingface.co/${MODEL_REPO}/resolve/main/${MODEL_FILE}
 RUN curl -fL --retry 3 -o /model.gguf "${MODEL_URL}"
 
 # ---------- stage 3: runtime ----------
