@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "verdict"
+version = "0.1.0"
+description = "Hybrid token-efficient routing agent — AMD Developer Hackathon ACT II, Track 1"
+requires-python = ">=3.12"
+# Runtime dependencies are pinned in requirements.txt (single source of truth).
+dependencies = []
+
+# App layout, not a library: run `python main.py` from the repo root (or in Docker at /app).
+[tool.setuptools.packages.find]
+include = ["src*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"

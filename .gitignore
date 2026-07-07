@@ -1,0 +1,53 @@
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+build/
+dist/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# ---- Virtual envs (CPU + GPU split) ----
+venv/
+venv-gpu/
+.venv/
+env/
+ENV/
+
+# ---- Secrets / local env ----
+.env
+.env.local
+*.key
+
+# ---- Model weights (baked into Docker image or downloaded; never committed) ----
+*.gguf
+*.bin
+*.safetensors
+*.pt
+models/weights/
+
+# ---- Generated / ephemeral pipeline outputs (raw inputs stay tracked, derived does not) ----
+answers*.jsonl
+outputs/
+runs/
+*.ledger.jsonl
+calibration_*.json
+*.pareto.csv
+*.pareto.png
+
+# ---- OS / editor junk ----
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+
+
+#agents 
+CLAUDE.md
+agents/
+.agents/

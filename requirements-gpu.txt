@@ -1,0 +1,8 @@
+# GPU-box extras (Colab / Lightning AI / rented box) — NOT installed in the Docker image.
+# The container runs llama.cpp llama-server (a compiled binary), so no Python GPU libs
+# are needed at submission time. These are for remote experimentation only.
+-r requirements.txt
+
+# Uncomment what the remote box needs:
+# llama-cpp-python  # if driving llama.cpp from Python instead of llama-server
+# huggingface_hub   # pulling GGUF weights

@@ -1,0 +1,4 @@
+# Runtime dependencies — kept deliberately tiny (Docker size + cold-start speed).
+httpx==0.28.1
+PyYAML==6.0.2
+jsonschema==4.23.0
