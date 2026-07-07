@@ -1,0 +1,679 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>verdict · run telemetry</title>
+<style>
+  :root {
+    --surface-1: #fcfcfb; --plane: #f9f9f7;
+    --ink-1: #0b0b0b; --ink-2: #52514e; --ink-muted: #898781;
+    --grid: #e1e0d9; --baseline: #c3c2b7;
+    --border: rgba(11,11,11,0.10);
+    --series-free: #2a78d6;   /* categorical slot 1: free routes */
+    --series-paid: #eb6834;   /* categorical slot 8: paid routes */
+    --seq-track: #cde2fb;     /* sequential 100: meter track */
+    --status-warning: #fab219; --status-critical: #d03b3b; --status-good: #0ca30c;
+    --wash: rgba(42,120,214,0.10);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --surface-1: #1a1a19; --plane: #0d0d0d;
+      --ink-1: #ffffff; --ink-2: #c3c2b7; --ink-muted: #898781;
+      --grid: #2c2c2a; --baseline: #383835;
+      --border: rgba(255,255,255,0.10);
+      --series-free: #3987e5; --series-paid: #d95926;
+      --seq-track: #0d366b;
+      --wash: rgba(57,135,229,0.12);
+    }
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body {
+    background: var(--plane); color: var(--ink-1);
+    font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
+    padding: 20px; max-width: 1180px; margin: 0 auto;
+  }
+  header { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 16px; }
+  header h1 { font-size: 18px; font-weight: 650; }
+  .pill {
+    font-size: 12px; font-weight: 600; padding: 2px 10px; border-radius: 999px;
+    border: 1px solid var(--border); color: var(--ink-2);
+  }
+  .pill.running { color: var(--status-good); }
+  .pill .dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%;
+    background: currentColor; margin-right: 5px; }
+  .src { margin-left: auto; display: flex; gap: 8px; align-items: center; font-size: 12px; color: var(--ink-muted); }
+  .src label {
+    border: 1px solid var(--border); border-radius: 6px; padding: 3px 10px; cursor: pointer;
+    color: var(--ink-2); background: var(--surface-1);
+  }
+  .src input { display: none; }
+  #empty {
+    border: 1px dashed var(--baseline); border-radius: 10px; padding: 36px; text-align: center;
+    color: var(--ink-2); margin-bottom: 16px;
+  }
+  #empty code { color: var(--ink-1); }
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-bottom: 12px; }
+  .tile {
+    background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px;
+  }
+  .tile .label { font-size: 12px; color: var(--ink-2); }
+  .tile .value { font-size: 30px; font-weight: 600; margin-top: 2px; }
+  .tile.hero .value { font-size: 48px; letter-spacing: -0.5px; }
+  .tile .sub { font-size: 12px; color: var(--ink-muted); margin-top: 2px; }
+  .tile .sub .good { color: var(--status-good); font-weight: 600; }
+  .meter { height: 8px; border-radius: 4px; background: var(--seq-track); margin-top: 10px; overflow: hidden; }
+  .meter > div { height: 100%; border-radius: 4px 0 0 4px; background: var(--series-free); }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 12px; }
+  .card {
+    background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px;
+    padding: 14px 16px; min-width: 0;
+  }
+  .card.wide { grid-column: 1 / -1; }
+  .card h2 { font-size: 13px; font-weight: 650; color: var(--ink-1); }
+  .card .hint { font-size: 12px; color: var(--ink-muted); margin-top: 2px; }
+  .legend { display: flex; gap: 14px; font-size: 12px; color: var(--ink-2); margin: 8px 0 2px; }
+  .legend .key { display: inline-block; width: 10px; height: 10px; border-radius: 3px;
+    margin-right: 5px; vertical-align: -1px; }
+  .legend .key.line { height: 3px; border-radius: 2px; vertical-align: 2px; }
+  svg text { font: 11px system-ui, sans-serif; fill: var(--ink-muted); }
+  svg .val { fill: var(--ink-2); font-variant-numeric: tabular-nums; }
+  svg .cat { fill: var(--ink-2); }
+  .chart-box { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; margin-top: 8px; font-size: 13px; }
+  th { text-align: left; color: var(--ink-muted); font-weight: 500; font-size: 12px;
+    border-bottom: 1px solid var(--grid); padding: 4px 10px 4px 0; }
+  td { border-bottom: 1px solid var(--grid); padding: 4px 10px 4px 0;
+    font-variant-numeric: tabular-nums; color: var(--ink-2); }
+  td:first-child, th:first-child { padding-left: 0; }
+  td.num, th.num { text-align: right; }
+  td.name { color: var(--ink-1); }
+  tr:last-child td { border-bottom: none; }
+  .table-box { overflow-x: auto; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .chip { font-size: 12px; color: var(--ink-2); border: 1px solid var(--border);
+    border-radius: 6px; padding: 2px 8px; background: var(--plane); }
+  .chip b { color: var(--ink-1); font-weight: 600; }
+  #tooltip {
+    position: fixed; pointer-events: none; z-index: 10; display: none;
+    background: var(--surface-1); border: 1px solid var(--border); border-radius: 8px;
+    padding: 8px 10px; font-size: 12px; box-shadow: 0 4px 14px rgba(0,0,0,0.18);
+    max-width: 260px;
+  }
+  #tooltip .t-title { color: var(--ink-muted); margin-bottom: 3px; }
+  #tooltip .row { display: flex; align-items: center; gap: 6px; }
+  #tooltip .row .k { width: 10px; height: 3px; border-radius: 2px; flex: none; }
+  #tooltip .row .v { font-weight: 650; color: var(--ink-1); font-variant-numeric: tabular-nums; }
+  #tooltip .row .n { color: var(--ink-2); }
+  footer { margin-top: 18px; font-size: 12px; color: var(--ink-muted); }
+  /* playground */
+  #play-card { margin-bottom: 12px; }
+  #play-log { display: flex; flex-direction: column; gap: 10px; margin: 10px 0; }
+  .turn .q { font-weight: 600; }
+  .turn .q::before { content: "you — "; color: var(--ink-muted); font-weight: 400; }
+  .turn .a {
+    white-space: pre-wrap; overflow-wrap: anywhere; color: var(--ink-2);
+    border-left: 2px solid var(--grid); padding-left: 10px; margin-top: 4px;
+  }
+  .turn .meta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+  .badge {
+    font-size: 11px; font-weight: 600; padding: 1px 8px; border-radius: 999px;
+    border: 1px solid var(--border); color: var(--ink-2); display: inline-flex;
+    align-items: center; gap: 5px;
+  }
+  .badge .k { width: 8px; height: 8px; border-radius: 50%; }
+  .turn .err { color: var(--status-critical); font-size: 13px; margin-top: 4px; }
+  #play-form { display: flex; gap: 8px; }
+  #play-input {
+    flex: 1; font: inherit; color: var(--ink-1); background: var(--plane);
+    border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px;
+  }
+  #play-input:focus { outline: 2px solid var(--series-free); outline-offset: -1px; }
+  #play-form button {
+    font: inherit; font-weight: 600; border: none; border-radius: 8px;
+    background: var(--series-free); color: #fff; padding: 8px 18px; cursor: pointer;
+  }
+  #play-form button:disabled { opacity: 0.5; cursor: default; }
+</style>
+</head>
+<body>
+<header>
+  <h1>verdict · run telemetry</h1>
+  <span class="pill" id="status"><span class="dot"></span><span id="status-text">no data</span></span>
+  <div class="src">
+    <span id="updated"></span>
+    <label>metrics.json <input type="file" id="f-metrics" accept=".json"></label>
+    <label>ledger.jsonl <input type="file" id="f-ledger" accept=".jsonl,.json"></label>
+  </div>
+</header>
+
+<div class="card wide" id="play-card" hidden>
+  <h2>Playground — ask the agent</h2>
+  <div class="hint">Your prompt runs through the real dispatcher and solvers — see which
+    route answers and what it costs. Try: <em>What day of the week was 2024-03-15?</em></div>
+  <div id="play-log"></div>
+  <form id="play-form">
+    <input id="play-input" placeholder="Type a task…" autocomplete="off" maxlength="8000">
+    <button id="play-btn">Ask</button>
+  </form>
+</div>
+
+<div id="empty">
+  <p><strong>Waiting for run artifacts.</strong></p>
+  <p>Serve them live with <code>python -m src.frontend.serve</code>, or load
+     <code>run.metrics.json</code> / <code>run.ledger.jsonl</code> with the buttons above
+     (drag &amp; drop works too).</p>
+</div>
+
+<div id="dash" hidden>
+  <div class="kpis">
+    <div class="tile hero">
+      <div class="label">Remote tokens (the score — lower wins)</div>
+      <div class="value" id="k-remote">–</div>
+      <div class="sub" id="k-remote-sub"></div>
+    </div>
+    <div class="tile">
+      <div class="label">Tokens kept off the meter</div>
+      <div class="value" id="k-saved">–</div>
+      <div class="sub" id="k-saved-sub"></div>
+    </div>
+    <div class="tile">
+      <div class="label">Tasks</div>
+      <div class="value" id="k-tasks">–</div>
+      <div class="sub" id="k-tasks-sub"></div>
+    </div>
+    <div class="tile">
+      <div class="label">Wall clock vs budget</div>
+      <div class="value" id="k-wall">–</div>
+      <div class="sub" id="k-wall-sub"></div>
+      <div class="meter"><div id="k-meter" style="width:0%"></div></div>
+    </div>
+  </div>
+
+  <div class="cards">
+    <div class="card">
+      <h2>How answers were produced</h2>
+      <div class="hint">Free routes cost zero score; paid routes hit Fireworks.</div>
+      <div class="legend">
+        <span><span class="key" style="background:var(--series-free)"></span>free · on-device</span>
+        <span><span class="key" style="background:var(--series-paid)"></span>paid · remote call</span>
+      </div>
+      <div class="chart-box"><svg id="routes-svg" role="img" aria-label="Tasks per route"></svg></div>
+    </div>
+
+    <div class="card">
+      <h2>Latency percentiles</h2>
+      <div class="hint">Milliseconds per phase, across finished tasks.</div>
+      <div class="table-box"><table id="latency-table"></table></div>
+    </div>
+
+    <div class="card wide" id="timeline-card">
+      <h2>Remote tokens over the run</h2>
+      <div class="hint">Cumulative scored tokens against the run clock — flat is winning.</div>
+      <div class="legend">
+        <span><span class="key line" style="background:var(--series-free)"></span>cumulative remote tokens</span>
+        <span><span class="key" style="background:var(--series-paid);border-radius:50%"></span>paid call</span>
+      </div>
+      <div class="chart-box"><svg id="timeline-svg" role="img" aria-label="Cumulative remote tokens over run time"></svg></div>
+    </div>
+
+    <div class="card wide">
+      <h2>Per category</h2>
+      <div class="table-box"><table id="cat-table"></table></div>
+    </div>
+
+    <div class="card wide" id="tasks-card" hidden>
+      <h2>Every task</h2>
+      <div class="hint">One row per finished task, from the ledger.</div>
+      <div class="table-box"><table id="task-table"></table></div>
+    </div>
+
+    <div class="card wide">
+      <h2>Environment</h2>
+      <div class="chips" id="hw-chips"></div>
+      <div class="chips" id="cfg-chips"></div>
+    </div>
+  </div>
+</div>
+
+<div id="tooltip"></div>
+<footer>verdict — hybrid token-efficient routing agent · reads <code>run.metrics.json</code> (schema v1) + <code>run.ledger.jsonl</code></footer>
+
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+const state = { metrics: null, ledger: [], live: false, pollTimer: null };
+
+const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+const FREE_ROUTES = new Set(["deterministic", "local", "local_repair", "local_unverified"]);
+
+function compact(n) {
+  if (n == null) return "–";
+  if (Math.abs(n) >= 1e6) return (n / 1e6).toFixed(1).replace(/\.0$/, "") + "M";
+  if (Math.abs(n) >= 1e4) return (n / 1e3).toFixed(1).replace(/\.0$/, "") + "K";
+  return n.toLocaleString("en-US");
+}
+function secs(s) {
+  if (s == null) return "–";
+  if (s < 90) return s.toFixed(s < 10 ? 1 : 0) + "s";
+  return Math.floor(s / 60) + "m " + Math.round(s % 60) + "s";
+}
+
+/* ------------------------------------------------ tooltip */
+const tip = $("tooltip");
+function showTip(evt, title, rows) {
+  tip.replaceChildren();
+  if (title) {
+    const t = document.createElement("div");
+    t.className = "t-title"; t.textContent = title;
+    tip.appendChild(t);
+  }
+  for (const r of rows) {
+    const row = document.createElement("div"); row.className = "row";
+    if (r.color) {
+      const k = document.createElement("span"); k.className = "k";
+      k.style.background = r.color; row.appendChild(k);
+    }
+    const v = document.createElement("span"); v.className = "v"; v.textContent = r.value;
+    const n = document.createElement("span"); n.className = "n"; n.textContent = r.name;
+    row.append(v, n);
+    tip.appendChild(row);
+  }
+  tip.style.display = "block";
+  const pad = 14, w = tip.offsetWidth, h = tip.offsetHeight;
+  let x = evt.clientX + pad, y = evt.clientY + pad;
+  if (x + w > innerWidth - 8) x = evt.clientX - w - pad;
+  if (y + h > innerHeight - 8) y = evt.clientY - h - pad;
+  tip.style.left = x + "px"; tip.style.top = y + "px";
+}
+function hideTip() { tip.style.display = "none"; }
+
+/* ------------------------------------------------ svg helpers */
+const NS = "http://www.w3.org/2000/svg";
+function el(name, attrs, parent) {
+  const e = document.createElementNS(NS, name);
+  for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
+  if (parent) parent.appendChild(e);
+  return e;
+}
+function textEl(parent, x, y, str, attrs = {}) {
+  const t = el("text", { x, y, ...attrs }, parent);
+  t.textContent = str;
+  return t;
+}
+
+/* ------------------------------------------------ routes bar chart */
+function renderRoutes() {
+  const svg = $("routes-svg");
+  svg.replaceChildren();
+  const routes = Object.entries(state.metrics.routes || {}).sort((a, b) => b[1] - a[1]);
+  if (!routes.length) return;
+  const width = Math.max(320, svg.parentNode.clientWidth || 320);
+  const rowH = 30, barH = 20, padL = 118, padR = 46, padT = 6;
+  const height = padT + routes.length * rowH + 6;
+  svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+  svg.setAttribute("width", width); svg.setAttribute("height", height);
+  const maxV = Math.max(...routes.map(([, v]) => v));
+  const plotW = width - padL - padR;
+  const free = css("--series-free"), paid = css("--series-paid");
+
+  routes.forEach(([name, count], i) => {
+    const y = padT + i * rowH + (rowH - barH) / 2;
+    const w = Math.max(2, (count / maxV) * plotW);
+    const color = FREE_ROUTES.has(name) ? free : paid;
+    const label = textEl(svg, padL - 8, y + barH / 2 + 4, name.replaceAll("_", " "),
+      { "text-anchor": "end", class: "cat" });
+    // 4px rounded data-end, square baseline: rounded rect clipped at the left edge
+    const bar = el("rect", {
+      x: padL, y, width: w, height: barH, rx: 4, fill: color,
+    }, svg);
+    el("rect", { x: padL, y, width: Math.min(4, w), height: barH, fill: color }, svg);
+    textEl(svg, padL + w + 6, y + barH / 2 + 4, String(count), { class: "val" });
+    // hit target wider than the mark
+    const hit = el("rect", {
+      x: 0, y: padT + i * rowH, width, height: rowH, fill: "transparent",
+    }, svg);
+    const pct = state.metrics.run.tasks_done
+      ? Math.round((100 * count) / state.metrics.run.tasks_done) : 0;
+    const move = (evt) => {
+      bar.setAttribute("opacity", "0.82");
+      showTip(evt, name.replaceAll("_", " "), [
+        { color, value: String(count), name: `task${count === 1 ? "" : "s"} · ${pct}% of run` },
+        { value: FREE_ROUTES.has(name) ? "0" : "remote", name: FREE_ROUTES.has(name) ? "scored tokens" : "tokens billed to score" },
+      ]);
+    };
+    hit.addEventListener("pointermove", move);
+    hit.addEventListener("pointerleave", () => { bar.removeAttribute("opacity"); hideTip(); });
+  });
+  el("line", { x1: padL, y1: padT, x2: padL, y2: height - 4, stroke: css("--baseline"), "stroke-width": 1 }, svg);
+}
+
+/* ------------------------------------------------ timeline (ledger) */
+function renderTimeline() {
+  const card = $("timeline-card");
+  const svg = $("timeline-svg");
+  svg.replaceChildren();
+  const rows = state.ledger.filter((r) => typeof r.t_s === "number")
+    .sort((a, b) => a.t_s - b.t_s);
+  if (!rows.length) {
+    card.querySelector(".hint").textContent =
+      "Load run.ledger.jsonl to see the token timeline.";
+    return;
+  }
+  card.querySelector(".hint").textContent =
+    "Cumulative scored tokens against the run clock — flat is winning.";
+
+  let cum = 0;
+  const pts = rows.map((r) => {
+    const rt = (r.remote_prompt_tokens || 0) + (r.remote_completion_tokens || 0);
+    cum += rt;
+    return { t: r.t_s, y: cum, paid: rt > 0, task: r.task_id, route: r.route, rt };
+  });
+  const width = Math.max(560, svg.parentNode.clientWidth || 560);
+  const height = 220, padL = 52, padR = 18, padT = 12, padB = 26;
+  svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+  svg.setAttribute("width", width); svg.setAttribute("height", height);
+  const maxT = Math.max(pts[pts.length - 1].t, 1);
+  const maxY = Math.max(cum, 1);
+  const X = (t) => padL + (t / maxT) * (width - padL - padR);
+  const Y = (v) => height - padB - (v / maxY) * (height - padT - padB);
+  const free = css("--series-free"), paid = css("--series-paid"), surface = css("--surface-1");
+
+  // gridlines: 3 clean horizontal hairlines
+  for (const frac of [0.25, 0.5, 0.75, 1]) {
+    const v = Math.round(maxY * frac);
+    el("line", { x1: padL, y1: Y(v), x2: width - padR, y2: Y(v), stroke: css("--grid"), "stroke-width": 1 }, svg);
+    textEl(svg, padL - 6, Y(v) + 4, compact(v), { "text-anchor": "end", class: "val" });
+  }
+  el("line", { x1: padL, y1: Y(0), x2: width - padR, y2: Y(0), stroke: css("--baseline"), "stroke-width": 1 }, svg);
+  for (const frac of [0, 0.5, 1]) {
+    textEl(svg, X(maxT * frac), height - 8, secs(maxT * frac), { "text-anchor": frac === 0 ? "start" : frac === 1 ? "end" : "middle" });
+  }
+
+  // step line + area wash
+  let d = `M ${X(0)} ${Y(0)}`;
+  for (const p of pts) d += ` L ${X(p.t)} ${Y(p.y - p.rt)} L ${X(p.t)} ${Y(p.y)}`;
+  el("path", {
+    d: d + ` L ${X(maxT)} ${Y(cum)} L ${X(maxT)} ${Y(0)} Z`,
+    fill: css("--wash"), stroke: "none",
+  }, svg);
+  el("path", {
+    d: d + ` L ${X(maxT)} ${Y(cum)}`,
+    fill: "none", stroke: free, "stroke-width": 2,
+    "stroke-linejoin": "round", "stroke-linecap": "round",
+  }, svg);
+
+  // paid-call markers: >=8px dot with 2px surface ring
+  for (const p of pts.filter((p) => p.paid)) {
+    el("circle", { cx: X(p.t), cy: Y(p.y), r: 6, fill: paid, stroke: surface, "stroke-width": 2 }, svg);
+  }
+
+  // crosshair + tooltip: snap to nearest task
+  const cross = el("line", {
+    x1: 0, y1: padT, x2: 0, y2: height - padB, stroke: css("--baseline"),
+    "stroke-width": 1, visibility: "hidden",
+  }, svg);
+  const hover = el("rect", { x: padL, y: 0, width: width - padL - padR, height, fill: "transparent" }, svg);
+  hover.addEventListener("pointermove", (evt) => {
+    const box = svg.getBoundingClientRect();
+    const mx = ((evt.clientX - box.left) / box.width) * width;
+    let best = pts[0];
+    for (const p of pts) if (Math.abs(X(p.t) - mx) < Math.abs(X(best.t) - mx)) best = p;
+    cross.setAttribute("x1", X(best.t)); cross.setAttribute("x2", X(best.t));
+    cross.setAttribute("visibility", "visible");
+    showTip(evt, `${best.task} · t=${secs(best.t)}`, [
+      { color: free, value: compact(best.y), name: "cumulative remote tokens" },
+      { color: best.paid ? paid : free, value: best.paid ? `+${best.rt}` : "+0", name: `this task (${best.route.replaceAll("_", " ")})` },
+    ]);
+  });
+  hover.addEventListener("pointerleave", () => { cross.setAttribute("visibility", "hidden"); hideTip(); });
+}
+
+/* ------------------------------------------------ tables */
+function makeTable(table, headers, rows, numericFrom = 1) {
+  table.replaceChildren();
+  const tr = document.createElement("tr");
+  headers.forEach((h, i) => {
+    const th = document.createElement("th");
+    th.textContent = h;
+    if (i >= numericFrom) th.className = "num";
+    tr.appendChild(th);
+  });
+  table.appendChild(tr);
+  for (const row of rows) {
+    const r = document.createElement("tr");
+    row.forEach((cell, i) => {
+      const td = document.createElement("td");
+      td.textContent = cell == null ? "–" : String(cell);
+      td.className = i === 0 ? "name" : i >= numericFrom ? "num" : "";
+      r.appendChild(td);
+    });
+    table.appendChild(r);
+  }
+}
+
+function renderLatency() {
+  const lat = state.metrics.latency_ms || {};
+  const nice = {
+    task_wall: "task wall", local_gen_per_task: "local generation",
+    remote_call: "remote call", dispatch: "dispatch", queue_wait: "queue wait",
+  };
+  makeTable($("latency-table"), ["phase", "p50", "p95", "max"],
+    Object.entries(lat).map(([k, v]) => [nice[k] || k, compact(v.p50), compact(v.p95), compact(v.max)]));
+}
+
+function renderCategories() {
+  const cats = Object.entries(state.metrics.by_category || {})
+    .sort((a, b) => b[1].tasks - a[1].tasks);
+  makeTable($("cat-table"),
+    ["category", "tasks", "routes", "remote tok", "local tok", "wall p50 ms", "wall max ms"],
+    cats.map(([name, c]) => [
+      name.replaceAll("_", " "), c.tasks,
+      Object.entries(c.routes || {}).map(([r, n]) => `${r.replaceAll("_", " ")} ×${n}`).join(", "),
+      compact(c.remote_tokens), compact(c.local_tokens),
+      c.wall_ms ? compact(c.wall_ms.p50) : null, c.wall_ms ? compact(c.wall_ms.max) : null,
+    ]), 3);
+}
+
+function renderTasks() {
+  const card = $("tasks-card");
+  if (!state.ledger.length) { card.hidden = true; return; }
+  card.hidden = false;
+  const rows = [...state.ledger].sort((a, b) => (a.t_s || 0) - (b.t_s || 0));
+  makeTable($("task-table"),
+    ["task", "category", "route", "conf", "remote tok", "local tok", "wall ms", "t"],
+    rows.map((r) => [
+      r.task_id, (r.category || "").replaceAll("_", " "), (r.route || "").replaceAll("_", " "),
+      r.confidence != null ? r.confidence.toFixed(2) : null,
+      (r.remote_prompt_tokens || 0) + (r.remote_completion_tokens || 0),
+      (r.local_prompt_tokens || 0) + (r.local_completion_tokens || 0),
+      compact(r.wall_ms), r.t_s != null ? secs(r.t_s) : null,
+    ]), 3);
+}
+
+function renderChips() {
+  const hw = state.metrics.hardware || {}, cfg = state.metrics.config || {};
+  const chipify = (target, entries) => {
+    target.replaceChildren();
+    for (const [k, v] of entries) {
+      if (v == null || v === "") continue;
+      const c = document.createElement("span"); c.className = "chip";
+      const b = document.createElement("b"); b.textContent = k + " ";
+      c.appendChild(b);
+      c.appendChild(document.createTextNode(
+        Array.isArray(v) ? (v.length ? v.join(", ") : "none") : String(v)));
+      target.appendChild(c);
+    }
+  };
+  chipify($("hw-chips"), [
+    ["cpu", hw.cpu_model], ["cores", hw.cores], ["ram", hw.ram_gb ? hw.ram_gb + " GB" : null],
+    ["gpu", hw.gpus && hw.gpus.length ? hw.gpus.join(", ") : "none detected"],
+    ["docker", hw.in_docker], ["python", hw.python], ["platform", hw.platform],
+  ]);
+  chipify($("cfg-chips"), Object.entries(cfg));
+}
+
+/* ------------------------------------------------ kpis + orchestration */
+function render() {
+  const m = state.metrics;
+  if (!m) return;
+  $("empty").hidden = true;
+  $("dash").hidden = false;
+
+  const running = m.status === "running";
+  $("status-text").textContent = m.status || "unknown";
+  $("status").classList.toggle("running", running);
+
+  const tok = m.tokens || {}, run = m.run || {};
+  $("k-remote").textContent = compact(tok.remote_total);
+  $("k-remote-sub").textContent =
+    `${compact(tok.remote_prompt)} prompt + ${compact(tok.remote_completion)} completion`;
+
+  $("k-saved").textContent = compact(tok.est_saved_vs_all_remote);
+  const denom = (tok.est_saved_vs_all_remote || 0) + (tok.remote_total || 0);
+  const savedSub = $("k-saved-sub");
+  savedSub.replaceChildren();
+  if (denom > 0) {
+    const pct = document.createElement("span");
+    pct.className = "good";
+    pct.textContent = Math.round((100 * (tok.est_saved_vs_all_remote || 0)) / denom) + "%";
+    savedSub.append(pct, document.createTextNode(" of would-be remote tokens answered free"));
+  }
+
+  $("k-tasks").textContent = `${run.tasks_done ?? "–"}`;
+  $("k-tasks-sub").textContent =
+    (run.tasks_remaining ? `${run.tasks_remaining} remaining · ` : "all done · ") +
+    Object.entries(run.modes_seen || {}).map(([k, v]) => `${k} ×${v}`).join(", ");
+
+  $("k-wall").textContent = secs(run.wall_s);
+  $("k-wall-sub").textContent = `of ${secs(run.budget_s)} budget · ${secs(run.headroom_s)} headroom`;
+  const frac = run.budget_s ? Math.min(1, (run.wall_s || 0) / run.budget_s) : 0;
+  const meter = $("k-meter");
+  meter.style.width = Math.max(1, frac * 100) + "%";
+  meter.style.background = frac > 0.9 ? css("--status-critical")
+    : frac > 0.7 ? css("--status-warning") : css("--series-free");
+
+  renderRoutes();
+  renderLatency();
+  renderTimeline();
+  renderCategories();
+  renderTasks();
+  renderChips();
+  $("updated").textContent = "updated " + new Date().toLocaleTimeString();
+}
+
+/* ------------------------------------------------ data sources */
+function parseLedger(text) {
+  const out = [];
+  for (const line of text.split("\n")) {
+    const s = line.trim();
+    if (!s) continue;
+    try { out.push(JSON.parse(s)); } catch { /* partial last line during live tail */ }
+  }
+  return out;
+}
+
+async function poll() {
+  clearTimeout(state.pollTimer);
+  let ok = false;
+  try {
+    const r = await fetch("metrics.json?t=" + Date.now(), { cache: "no-store" });
+    if (r.ok) { state.metrics = await r.json(); ok = true; state.live = true; }
+  } catch { /* not served — file mode */ }
+  if (ok) {
+    try {
+      const r = await fetch("ledger.jsonl?t=" + Date.now(), { cache: "no-store" });
+      if (r.ok) state.ledger = parseLedger(await r.text());
+    } catch { /* ledger optional */ }
+    render();
+  }
+  if (state.live && (!state.metrics || state.metrics.status === "running")) {
+    state.pollTimer = setTimeout(poll, 2000);
+  } else if (state.live) {
+    state.pollTimer = setTimeout(poll, 15000); // complete: slow refresh for reruns
+  }
+}
+
+function loadFile(file) {
+  const reader = new FileReader();
+  reader.onload = () => {
+    const text = String(reader.result);
+    if (file.name.endsWith(".jsonl") || text.trimStart().startsWith('{"task_id"')) {
+      state.ledger = parseLedger(text);
+    } else {
+      try { state.metrics = JSON.parse(text); } catch { alert("Not valid JSON: " + file.name); }
+    }
+    render();
+  };
+  reader.readAsText(file);
+}
+$("f-metrics").addEventListener("change", (e) => e.target.files[0] && loadFile(e.target.files[0]));
+$("f-ledger").addEventListener("change", (e) => e.target.files[0] && loadFile(e.target.files[0]));
+document.addEventListener("dragover", (e) => e.preventDefault());
+document.addEventListener("drop", (e) => {
+  e.preventDefault();
+  for (const f of e.dataTransfer.files) loadFile(f);
+});
+/* ------------------------------------------------ playground */
+const FREE_BADGE = () => css("--series-free"), PAID_BADGE = () => css("--series-paid");
+if (location.protocol.startsWith("http")) $("play-card").hidden = false;
+
+function badge(label, color) {
+  const b = document.createElement("span"); b.className = "badge";
+  if (color) {
+    const k = document.createElement("span"); k.className = "k";
+    k.style.background = color; b.appendChild(k);
+  }
+  b.appendChild(document.createTextNode(label));
+  return b;
+}
+
+$("play-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const input = $("play-input"), btn = $("play-btn");
+  const prompt = input.value.trim();
+  if (!prompt) return;
+  const turn = document.createElement("div"); turn.className = "turn";
+  const q = document.createElement("div"); q.className = "q"; q.textContent = prompt;
+  const a = document.createElement("div"); a.className = "a"; a.textContent = "thinking…";
+  turn.append(q, a);
+  $("play-log").appendChild(turn);
+  turn.scrollIntoView({ block: "nearest" });
+  input.value = ""; input.disabled = true; btn.disabled = true;
+  try {
+    const r = await fetch("solve", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt }),
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || r.statusText);
+    a.textContent = d.answer || "(empty answer)";
+    const meta = document.createElement("div"); meta.className = "meta";
+    const paid = !FREE_ROUTES.has(d.route);
+    meta.appendChild(badge(d.route.replaceAll("_", " "), paid ? PAID_BADGE() : FREE_BADGE()));
+    meta.appendChild(badge(d.category.replaceAll("_", " ")));
+    meta.appendChild(badge("confidence " + d.confidence.toFixed(2)));
+    meta.appendChild(badge(paid ? d.remote_tokens + " scored tokens" : "0 scored tokens"));
+    meta.appendChild(badge(compact(d.wall_ms) + " ms"));
+    turn.appendChild(meta);
+  } catch (err) {
+    a.remove();
+    const msg = document.createElement("div"); msg.className = "err";
+    msg.textContent = "failed: " + err.message;
+    turn.appendChild(msg);
+  } finally {
+    input.disabled = false; btn.disabled = false; input.focus();
+  }
+});
+
+let resizeTimer = null;
+addEventListener("resize", () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => state.metrics && render(), 150);
+});
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => state.metrics && render());
+
+poll();
+</script>
+</body>
+</html>
