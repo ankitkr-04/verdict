@@ -42,12 +42,13 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY config/ config/
 COPY src/ src/
-COPY main.py docker/entrypoint.sh ./
-RUN chmod +x entrypoint.sh
+COPY main.py ./
 
+# The app manages llama-server itself: finds the binary on PATH, uses the
+# baked weights at LLAMA_MODEL_PATH, spawns and reaps the process.
 ENV VERDICT_LOCAL_BACKEND=llama \
     VERDICT_REMOTE_BACKEND=fireworks \
     VERDICT_LOCAL_BASE_URL=http://127.0.0.1:8080/v1 \
     LLAMA_MODEL_PATH=/models/model.gguf
 
-ENTRYPOINT ["./entrypoint.sh"]
+ENTRYPOINT ["python", "main.py"]

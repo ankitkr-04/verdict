@@ -36,11 +36,24 @@ INPUT_TASKS_PATH = Path(_env("VERDICT_INPUT", "/input/tasks.json"))
 OUTPUT_RESULTS_PATH = Path(_env("VERDICT_OUTPUT", "/output/results.json"))
 LEDGER_PATH = Path(_env("VERDICT_LEDGER", "/tmp/verdict.ledger.jsonl"))
 
-# ---- Local model weights (GPU box; the Docker image bakes them at build time) ----
+# ---- Local model weights (auto-downloaded when absent; Docker bakes them at build) ----
 MODEL_REPO = _env("VERDICT_MODEL_REPO", "unsloth/Qwen3-4B-Instruct-2507-GGUF")
 MODEL_FILE = _env("VERDICT_MODEL_FILE", "Qwen3-4B-Instruct-2507-Q4_K_M.gguf")
 MODEL_DIR = Path(_env("VERDICT_MODEL_DIR", str(REPO_ROOT / "models")))
 MODEL_LINK = MODEL_DIR / "model.gguf"  # stable path llama-server is pointed at
+
+# ---- Self-managed llama-server (spawned by the app when nothing answers /health) ----
+LLAMA_BIN = _env("VERDICT_LLAMA_BIN", "llama-server")  # name on PATH or explicit path
+LLAMA_BIN_CANDIDATES = [  # fallbacks probed after PATH
+    REPO_ROOT / "llama.cpp" / "build" / "bin" / "llama-server",
+    Path("/usr/local/bin/llama-server"),
+]
+LLAMA_MODEL_PATH = os.environ.get("LLAMA_MODEL_PATH")  # explicit weights (container)
+LLAMA_CTX = _env_int("LLAMA_CTX", 16384)
+LLAMA_PARALLEL = _env_int("LLAMA_PARALLEL", 4)
+LLAMA_THREADS = _env_int("LLAMA_THREADS", os.cpu_count() or 4)
+LLAMA_NGL = _env_int("LLAMA_NGL", 99)  # GPU layers; harmless no-op on CPU builds
+LLAMA_LOG_PATH = Path(_env("VERDICT_LLAMA_LOG", "/tmp/llama-server.log"))
 
 # ---- Config files ----
 CONFIG_DIR = Path(_env("VERDICT_CONFIG_DIR", str(REPO_ROOT / "config")))

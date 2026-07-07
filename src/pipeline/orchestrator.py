@@ -14,6 +14,7 @@ from src.core import settings
 from src.core.config import load_config
 from src.core.schemas import Category, Route, SolveResult, Task
 from src.llm.local_llm import make_local
+from src.llm.local_server import ensure_local_server
 from src.llm.remote_llm import RemoteError, make_remote
 from src.pipeline.ledger import Ledger
 from src.pipeline.results_writer import ResultsWriter
@@ -72,7 +73,11 @@ async def run(tasks: list[Task], writer: ResultsWriter) -> None:
             writer.flush()
             ledger.record(result)
 
+    server = None
     try:
+        # Self-managed local engine: spawns llama-server (downloading weights
+        # if absent) unless one is already listening or the backend is mock.
+        server = await ensure_local_server(config.local)
         await local.wait_ready(settings.LOCAL_READY_TIMEOUT_S)
         if hasattr(local, "warmup"):
             await local.warmup()
@@ -87,6 +92,8 @@ async def run(tasks: list[Task], writer: ResultsWriter) -> None:
         ledger.print_summary()
         await local.close()
         await remote.close()
+        if server is not None:
+            server.stop()
 
 
 async def _ensure_remote_usage(
