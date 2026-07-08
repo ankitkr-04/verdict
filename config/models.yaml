@@ -46,7 +46,8 @@ remote:
   max_retries: 1
   retry_backoff_s: 1.0
   # Byte-identical system prefix on every remote call -> Fireworks prompt-cache discount.
-  system: "Answer directly and correctly. No preamble."
+  # Kept minimal: every system token is billed on every escalation.
+  system: "${VERDICT_REMOTE_SYSTEM:-Answer correctly. No preamble.}"
   # Raw JSON merged into every remote request body — day-of escape hatch, e.g.
   # '{"response_format": {"type": "json_object"}}' or a reasoning-effort knob to stop
   # a reasoning model from billing hidden thinking tokens as completion tokens.
