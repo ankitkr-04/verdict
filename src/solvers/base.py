@@ -76,6 +76,7 @@ class BaseSolver(ABC):
             temperature=p.temperature if temperature is None else temperature,
             max_tokens=p.max_tokens if max_tokens is None else max_tokens,
             stop=stop,
+            sampling=p.extra.get("sampling"),
         )
         attempt.local_ms += int((time.monotonic() - t0) * 1000)
         attempt.local_calls += 1

@@ -15,7 +15,7 @@ dispatch:
   priority: [code_debug, ner, summarize, sentiment, math, logic, code_gen]
 
 defaults:
-  temperature: 0.2
+  temperature: 0.7   # Qwen3.5 instruct general rec; greedy decoding degrades this family
   max_tokens: 384
   n_samples: 1
   repair_attempts: 1
@@ -61,7 +61,7 @@ categories:
         ```
         It failed with: {feedback}
         Output ONLY a corrected fenced python code block ending with one print() of the answer.
-    temperature: 0.2
+    temperature: 0.7
     max_tokens: 300
     n_samples: 1
     repair_attempts: 1
@@ -96,7 +96,7 @@ categories:
         that check the examples given in the task (and 1-2 obvious edge cases if none given).
         Output ONLY a fenced python code block containing assert lines. If the task gives
         no checkable examples, output a block containing only: pass
-    temperature: 0.2
+    temperature: 0.7
     max_tokens: 500
     repair_attempts: 1
     escalate:
@@ -125,7 +125,7 @@ categories:
         ```
         It still fails: {feedback}
         State the bug in one sentence, then output the FULL corrected code in one fenced block.
-    temperature: 0.2
+    temperature: 0.7
     max_tokens: 500
     repair_attempts: 1
     answer_format: "{answer}"
@@ -155,7 +155,7 @@ categories:
 
         It was invalid: {feedback}
         Output ONLY the corrected JSON array in the required schema.
-    temperature: 0.1
+    temperature: 0.7
     max_tokens: 400
     n_samples: 2
     repair_attempts: 1
@@ -185,7 +185,7 @@ categories:
 
         Constraint violation: {feedback}
         Rewrite the summary so it satisfies the constraint exactly. Output only the summary.
-    temperature: 0.3
+    temperature: 0.7
     max_tokens: 300
     repair_attempts: 2
     escalate:
@@ -211,7 +211,7 @@ categories:
 
         Your previous reply was invalid: {feedback}
         Reply again: line 1 exactly one label word, line 2 one-sentence justification.
-    temperature: 0.2
+    temperature: 0.7
     max_tokens: 120
     n_samples: 2
     repair_attempts: 1
@@ -235,7 +235,8 @@ categories:
       repair: >-
         Your answer violated: {feedback}
         Re-solve carefully. End with one line: "FINAL: <answer>".
-    temperature: 0.6
+    temperature: 1.0   # Qwen3.5 reasoning rec
+    sampling: {top_p: 1.0, top_k: 40, presence_penalty: 2.0}
     max_tokens: 600
     n_samples: 3
     majority_min: 2
@@ -257,7 +258,7 @@ categories:
         asked, define it directly. No filler.
       user: "{prompt}"
       repair: ""
-    temperature: 0.3
+    temperature: 0.7
     max_tokens: 220
     n_samples: 2
     theta: 0.6

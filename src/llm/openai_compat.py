@@ -29,6 +29,8 @@ async def chat_completion(
     stop: list[str] | None = None,
     logprobs: bool = False,
     api_key: str | None = None,
+    sampling: dict[str, float] | None = None,
+    extra_body: dict[str, Any] | None = None,
 ) -> LLMResponse:
     messages = []
     if system:
@@ -45,6 +47,10 @@ async def chat_completion(
         payload["stop"] = stop[:4]
     if logprobs:
         payload["logprobs"] = True
+    if sampling:  # top_p / top_k / min_p / presence_penalty etc.
+        payload.update(sampling)
+    if extra_body:  # config escape hatch (e.g. response_format, reasoning knobs)
+        payload.update(extra_body)
 
     headers = {"Authorization": f"Bearer {api_key}"} if api_key else {}
     resp = await client.post(f"{base_url}/chat/completions", json=payload, headers=headers)

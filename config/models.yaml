@@ -12,6 +12,14 @@ local:
   # Qwen3.5 Small ships with reasoning OFF by default, so nothing is needed.
   # Running an older Qwen3 instead? Set this back to " /no_think".
   no_think_suffix: "${VERDICT_NO_THINK_SUFFIX:-}"
+  # Official Qwen3.5 instruct-mode sampling (model card). The Qwen3 family is
+  # documented to degrade/loop under greedy decoding — do not zero these out.
+  # Per-category overrides live in categories.yaml under `sampling:`.
+  sampling:
+    top_p: ${VERDICT_LOCAL_TOP_P:-0.8}
+    top_k: ${VERDICT_LOCAL_TOP_K:-20}
+    min_p: ${VERDICT_LOCAL_MIN_P:-0.0}
+    presence_penalty: ${VERDICT_LOCAL_PRESENCE_PENALTY:-1.5}
 
 remote:
   backend: ${VERDICT_REMOTE_BACKEND:-fireworks}   # fireworks | mock

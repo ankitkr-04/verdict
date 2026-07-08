@@ -29,7 +29,7 @@ class LocalLLM(Protocol):
 
     async def generate(
         self, system: str, user: str, *, temperature: float, max_tokens: int,
-        stop: list[str] | None = None,
+        stop: list[str] | None = None, sampling: dict[str, float] | None = None,
     ) -> LLMResponse: ...
 
     async def wait_ready(self, timeout_s: float) -> None: ...
@@ -45,6 +45,11 @@ class LlamaLocal:
         self.model = str(cfg.get("model", "local"))
         self.logprobs = bool(cfg.get("logprobs", True))
         self.no_think_suffix = str(cfg.get("no_think_suffix", ""))
+        # Model-family sampling defaults (Qwen3.5 card: top_p/top_k/min_p/presence_penalty).
+        self.sampling = {
+            k: float(v) for k, v in (cfg.get("sampling") or {}).items()
+            if v is not None and str(v) != ""
+        }
         timeout = float(cfg.get("timeout_s", 20))
         slots = int(cfg.get("slots", 4))
         self._sem = asyncio.Semaphore(slots)
@@ -52,7 +57,7 @@ class LlamaLocal:
 
     async def generate(
         self, system: str, user: str, *, temperature: float, max_tokens: int,
-        stop: list[str] | None = None,
+        stop: list[str] | None = None, sampling: dict[str, float] | None = None,
     ) -> LLMResponse:
         async with self._sem:
             try:
@@ -60,6 +65,7 @@ class LlamaLocal:
                     self._client, base_url=self.base_url, model=self.model,
                     system=system, user=user, temperature=temperature,
                     max_tokens=max_tokens, stop=stop, logprobs=self.logprobs,
+                    sampling={**self.sampling, **(sampling or {})},
                 )
             except (httpx.HTTPError, KeyError, ValueError) as e:
                 raise LocalError(f"local generation failed: {e!r}") from e
@@ -142,7 +148,7 @@ class MockLocal:
 
     async def generate(
         self, system: str, user: str, *, temperature: float, max_tokens: int,
-        stop: list[str] | None = None,
+        stop: list[str] | None = None, sampling: dict[str, float] | None = None,
     ) -> LLMResponse:
         await asyncio.sleep(settings.MOCK_LATENCY_S)
         corrupt = self._rng.random() < settings.MOCK_FAIL_RATE
