@@ -1,0 +1,39 @@
+[
+  { "task_id": "calc-discount", "probe": "calc-delegation: compound percentage, must compute exactly", "expected": "153", "prompt": "A jacket costs $200. The store takes 15% off, then takes another 10% off the reduced price at checkout. What is the final price in dollars?" },
+  { "task_id": "calc-recipe", "probe": "calc-delegation: fractional multi-step word problem", "expected": "137.5", "prompt": "A recipe for 4 servings needs 250 g of flour. You are cooking for 7 people and already have 300 g of flour. How many more grams of flour do you need? Give the number only." },
+  { "task_id": "calc-speed", "probe": "calc-delegation: unit conversion embedded in prose", "expected": "1125 meters", "prompt": "A car moves at a steady 90 km/h. How many meters does it travel in 45 seconds?" },
+  { "task_id": "calc-time", "probe": "calc-delegation: clock arithmetic across the hour", "expected": "4:25 PM", "prompt": "A meeting begins at 2:50 PM and runs for 95 minutes. At what clock time does it end?" },
+  { "task_id": "calc-eggs", "probe": "ambiguity+calc: 'dozen' must be interpreted then computed", "expected": "16", "prompt": "I have 3 dozen eggs and use 20 of them for baking. How many eggs remain?" },
+
+  { "task_id": "logic-age", "probe": "combined logic+calc: does it delegate the algebra?", "expected": "20", "prompt": "Tom is twice as old as Sara. In 5 years, their combined age will be 40. How old is Tom now?" },
+  { "task_id": "logic-tollens", "probe": "multi-step logic: modus tollens, resist the obvious", "expected": "It did not rain.", "prompt": "If it rains, the match is cancelled. The match was not cancelled. What can you conclude about whether it rained? Answer in one sentence." },
+  { "task_id": "logic-order", "probe": "combined logic: transitive ordering from mixed comparisons", "expected": "D > A > B > C", "prompt": "A is heavier than B. C is lighter than B. D is heavier than A. Order all four (A, B, C, D) from heaviest to lightest." },
+  { "task_id": "logic-seating", "probe": "multi-constraint logic puzzle", "expected": "Dana", "prompt": "Four people sit in a row of seats numbered 1 to 4, left to right. Ben is not in seat 1 or 4. Ada is somewhere to the left of Ben. Cara is in seat 4. Dana is directly right of Ada. Who is in seat 2?" },
+  { "task_id": "logic-knave", "probe": "logic: self-referential truth puzzle", "expected": "knave", "prompt": "On an island, knights always tell the truth and knaves always lie. A says: 'I am a knave.' Is A a knight or a knave? (Consider whether either role is even consistent.)" },
+
+  { "task_id": "amb-coupledozen", "probe": "ambiguity: informal quantities need interpretation", "expected": "24", "prompt": "Roughly how many is 'a couple of dozen'? Give a single number." },
+  { "task_id": "amb-halfoff", "probe": "ambiguity: 'half off' vs 'half price' phrasing", "expected": "60", "prompt": "An item was half off and I paid $30. What was the original price?" },
+  { "task_id": "amb-opinion", "probe": "ambiguity: subjective question, should hedge not assert a hard fact", "expected": "balanced/it depends", "prompt": "Is Python a better language than Java? Answer in one or two sentences." },
+  { "task_id": "amb-underspecified", "probe": "ambiguity: missing referent, should ask/qualify not hallucinate", "expected": "needs the current date / cannot determine", "prompt": "What is the date next Friday?" },
+
+  { "task_id": "sent-sarcasm", "probe": "human nuance: sarcasm inverts surface polarity", "expected": "negative", "prompt": "Classify the sentiment (positive, negative, or neutral): 'Oh great, another software update that breaks everything. Exactly what I wanted today.'" },
+  { "task_id": "sent-mixed", "probe": "human nuance: genuinely mixed, net-negative", "expected": "negative (mixed)", "prompt": "Classify the sentiment (positive, negative, or neutral): 'The cinematography was stunning, but the story dragged and I checked my phone twice.'" },
+  { "task_id": "sent-negation", "probe": "human nuance: double negation / faint praise", "expected": "negative", "prompt": "Classify the sentiment (positive, negative, or neutral): \"This isn't the worst laptop I've owned, but I wouldn't buy it again.\"" },
+  { "task_id": "sent-implicit", "probe": "human nuance: implied complaint, no sentiment words", "expected": "negative", "prompt": "Classify the sentiment (positive, negative, or neutral): 'Well, the package finally arrived. Three weeks late.'" },
+
+  { "task_id": "sum-exact", "probe": "constraint compliance: exact word count", "expected": "8-word summary", "prompt": "Summarize the following in exactly 8 words: 'Remote work reshaped office culture. Companies shed real estate, workers moved to cheaper cities, and collaboration software became critical daily infrastructure across nearly every industry.'" },
+  { "task_id": "sum-buried", "probe": "nuance: key point is the final clause, resist lead bias", "expected": "the drug failed / trial was unsuccessful", "prompt": "Summarize the main finding in one sentence: 'The trial enrolled 1,200 patients across 30 sites over three years at considerable cost. Early phases were promising and widely covered in the press. Ultimately, however, the drug showed no benefit over placebo and the program was discontinued.'" },
+
+  { "task_id": "ner-ambiguous", "probe": "nuance: ambiguous entity types (person vs place vs org)", "expected": "Jordan=PERSON, Apple=ORG, Washington=LOCATION", "prompt": "Extract named entities with their types (person, organization, location, date): 'Jordan met Apple's CEO in Washington last Tuesday.'" },
+  { "task_id": "ner-dateformat", "probe": "nuance: non-standard date + tricky location", "expected": "The Hague=LOCATION, 3 July 1999=DATE", "prompt": "Extract all person, organization, location, and date entities: \"The agreement was signed on the 3rd of July '99 in The Hague.\"" },
+
+  { "task_id": "fact-brainmyth", "probe": "factual: resist a popular misconception", "expected": "no (myth)", "prompt": "Do humans use only 10% of their brains? Answer yes or no, then explain in one sentence." },
+  { "task_id": "fact-hottest", "probe": "factual: common trap (Mercury vs Venus)", "expected": "Venus", "prompt": "Which planet is the hottest in our solar system?" },
+
+  { "task_id": "codegen-median", "probe": "code_gen: edge cases (empty list, even length)", "expected": "correct median with None on empty", "prompt": "Write a Python function median(nums) that returns the median of a list of numbers. Return None for an empty list, and for an even number of elements return the average of the two middle values." },
+  { "task_id": "debug-mutation", "probe": "code_debug: mutation-during-iteration bug", "expected": "[1, 3, 5]", "prompt": "Fix the bug so the output is correct:\n```python\ndef remove_evens(xs):\n    for x in xs:\n        if x % 2 == 0:\n            xs.remove(x)\n    return xs\n\nprint(remove_evens([1, 2, 3, 4, 5, 6]))\n```\nExpected output: [1, 3, 5]" },
+
+  { "task_id": "det-percent", "probe": "deterministic lane should catch: plain percent", "expected": "36", "prompt": "What is 15% of 240?" },
+  { "task_id": "det-vowels", "probe": "deterministic lane should catch: vowel count", "expected": "5", "prompt": "How many vowels are in the word 'encyclopedia'?" },
+  { "task_id": "det-defer", "probe": "prove-or-defer: looks arithmetic but is a word problem, must NOT be wrongly caught", "expected": "80", "prompt": "A triangle has two angles measuring 40 and 60 degrees. What is the third angle in degrees?" }
+]
