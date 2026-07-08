@@ -33,14 +33,16 @@ categories:
   # calendar math (its weakest skills).
   math:
     dispatch:
-      keywords: [calculate, compute, sum, total, average, percent, percentage, profit,
-                 interest, price, cost, speed, distance, probability, ratio, fraction,
+      keywords: [calculate, compute, sum, total, average, mean, median, percent, percentage,
+                 profit, interest, price, cost, speed, distance, probability, ratio, fraction,
                  convert, conversion, celsius, fahrenheit, kilometers, miles, liters,
-                 gallons, ounces, kilograms]
+                 gallons, ounces, kilograms, gcd, lcm, factorial, remainder, divisible]
       patterns: ['\d+\s*%', '\d+\s*[+\-*/^]\s*\d+', 'how (?:many|much)', '\bif .*\d+.*\bhow\b',
                  'day of the week', 'how many days .*between', '\d+\s*days?\s*(?:after|before|from|later)',
                  'what date', 'convert .*\d.* to', 'how many (?:letters|vowels|consonants|characters|words|times)',
-                 'reverse (?:the )?(?:string|word|letters)', 'spelled backwards?', 'alphabetical order']
+                 'reverse (?:the )?(?:string|word|letters)', 'spelled backwards?', 'alphabetical order',
+                 '(?:square|cube) root', 'common (?:divisor|factor|multiple)',
+                 'percent(?:age)? (?:increase|decrease|change)']
     solver: math
     verifier: pyexec_math
     prompt:

@@ -12,9 +12,10 @@ from __future__ import annotations
 
 import ast
 import calendar
+import math
 import operator
 import re
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 
 _MAX_ABS_RESULT = 1e15
 _MAX_EXPONENT = 12
@@ -193,6 +194,187 @@ def _date_offset(prompt: str) -> str | None:
     return result.isoformat()
 
 
+# ---------------------------------------------------------------- number lists
+
+_NUM = r"-?\d+(?:\.\d+)?"
+_LIST_STATS_RE = re.compile(
+    rf"^\s*(?:what\s+is|what's|calculate|compute|find)\s+the\s+"
+    rf"(average|mean|median|sum|total|minimum|maximum|smallest|largest|range)\s+"
+    rf"of(?:\s+the\s+numbers?)?[:\s]+({_NUM}(?:\s*(?:,|and)\s+{_NUM})+)\s*[?.!]*\s*$",
+    re.IGNORECASE,
+)
+
+
+def _list_stats(prompt: str) -> str | None:
+    m = _LIST_STATS_RE.match(prompt)
+    if not m:
+        return None
+    op = m.group(1).lower()
+    nums = [float(x) for x in re.findall(_NUM, m.group(2))]
+    if len(nums) < 2:
+        return None
+    if op in ("average", "mean"):
+        value = sum(nums) / len(nums)
+    elif op == "median":
+        s = sorted(nums)
+        mid = len(s) // 2
+        value = s[mid] if len(s) % 2 else (s[mid - 1] + s[mid]) / 2
+    elif op in ("sum", "total"):
+        value = sum(nums)
+    elif op in ("minimum", "smallest"):
+        value = min(nums)
+    elif op in ("maximum", "largest"):
+        value = max(nums)
+    else:  # range
+        value = max(nums) - min(nums)
+    return _fmt_num(value)
+
+
+_GCD_LCM_RE = re.compile(
+    rf"^\s*(?:what\s+is|what's|calculate|compute|find)\s+the\s+"
+    rf"(gcd|hcf|lcm|greatest\s+common\s+(?:divisor|factor)|highest\s+common\s+factor|"
+    rf"least\s+common\s+multiple|lowest\s+common\s+multiple)\s+"
+    rf"of\s+(\d+)\s+(?:,|and)\s+(\d+)\s*[?.!]*\s*$",
+    re.IGNORECASE,
+)
+
+
+def _gcd_lcm(prompt: str) -> str | None:
+    m = _GCD_LCM_RE.match(prompt)
+    if not m:
+        return None
+    op = m.group(1).lower()
+    a, b = int(m.group(2)), int(m.group(3))
+    if a == 0 or b == 0 or a > 10**9 or b > 10**9:
+        return None
+    if "lcm" in op or "multiple" in op:
+        return str(a * b // math.gcd(a, b))
+    return str(math.gcd(a, b))
+
+
+_FACTORIAL_RE = re.compile(
+    r"^\s*(?:what\s+is|what's|calculate|compute)\s+"
+    r"(?:the\s+factorial\s+of\s+(\d+)|(\d+)\s*(?:factorial|!))\s*[?.!]*\s*$",
+    re.IGNORECASE,
+)
+
+
+def _factorial(prompt: str) -> str | None:
+    m = _FACTORIAL_RE.match(prompt)
+    if not m:
+        return None
+    n = int(m.group(1) or m.group(2))
+    if n > 20:  # beyond this the expected format (sci notation?) is ambiguous
+        return None
+    return str(math.factorial(n))
+
+
+_ROOT_RE = re.compile(
+    rf"^\s*(?:what\s+is|what's|calculate|compute|find)\s+the\s+"
+    rf"(square|cube)\s+root\s+of\s+({_NUM})\s*[?.!]*\s*$",
+    re.IGNORECASE,
+)
+
+
+def _root(prompt: str) -> str | None:
+    m = _ROOT_RE.match(prompt)
+    if not m:
+        return None
+    x = float(m.group(2))
+    if x < 0:
+        return None
+    value = x ** (1 / 2 if m.group(1).lower() == "square" else 1 / 3)
+    rounded = round(value)
+    if abs(rounded**2 - x) < 1e-9 if m.group(1).lower() == "square" else abs(rounded**3 - x) < 1e-9:
+        return str(rounded)  # exact roots stay integers
+    return _fmt_num(round(value, 4))
+
+
+_PCT_CHANGE_RE = re.compile(
+    rf"^\s*(?:what\s+is|what's|calculate|compute|find)\s+the\s+"
+    rf"percent(?:age)?\s+(increase|decrease|change)\s+from\s+({_NUM})\s+to\s+({_NUM})\s*[?.!]*\s*$",
+    re.IGNORECASE,
+)
+
+
+def _percent_change(prompt: str) -> str | None:
+    m = _PCT_CHANGE_RE.match(prompt)
+    if not m:
+        return None
+    old, new = float(m.group(2)), float(m.group(3))
+    if old == 0:
+        return None
+    change = (new - old) / old * 100
+    if m.group(1).lower() == "decrease":
+        change = -change
+    return _fmt_num(round(change, 4)) + "%"
+
+
+# ---------------------------------------------------------------- unit conversion
+
+# unit -> (canonical per-unit factor, dimension). Linear units only; temperature
+# is handled separately. Aliases share a dimension so cross-dimension never fires.
+_UNITS: dict[str, tuple[float, str]] = {
+    "kilometer": (1000.0, "len"), "km": (1000.0, "len"),
+    "meter": (1.0, "len"), "metre": (1.0, "len"), "m": (1.0, "len"),
+    "centimeter": (0.01, "len"), "cm": (0.01, "len"),
+    "millimeter": (0.001, "len"), "mm": (0.001, "len"),
+    "mile": (1609.344, "len"), "mi": (1609.344, "len"),
+    "yard": (0.9144, "len"), "foot": (0.3048, "len"), "feet": (0.3048, "len"),
+    "ft": (0.3048, "len"), "inch": (0.0254, "len"), "inches": (0.0254, "len"),
+    "kilogram": (1000.0, "mass"), "kg": (1000.0, "mass"),
+    "gram": (1.0, "mass"), "g": (1.0, "mass"),
+    "pound": (453.59237, "mass"), "lb": (453.59237, "mass"), "lbs": (453.59237, "mass"),
+    "ounce": (28.349523125, "mass"), "oz": (28.349523125, "mass"),
+    "liter": (1.0, "vol"), "litre": (1.0, "vol"), "l": (1.0, "vol"),
+    "milliliter": (0.001, "vol"), "ml": (0.001, "vol"),
+    "gallon": (3.785411784, "vol"),
+    "hour": (3600.0, "time"), "minute": (60.0, "time"), "second": (1.0, "time"),
+    "day": (86400.0, "time"), "week": (604800.0, "time"),
+}
+
+_CONVERT_RE = re.compile(
+    rf"^\s*(?:convert\s+|what\s+is\s+|what's\s+|how\s+many\s+\w+\s+(?:is|are|in)\s+)?"
+    rf"({_NUM})\s*([a-zA-Z]+)\s+(?:to|in|into)\s+([a-zA-Z]+)\s*[?.!]*\s*$",
+    re.IGNORECASE,
+)
+
+_TEMP_RE = re.compile(
+    rf"^\s*(?:convert\s+|what\s+is\s+|what's\s+)?({_NUM})\s*(?:°|degrees?\s*)?"
+    rf"(celsius|fahrenheit|kelvin|c|f|k)\s+(?:to|in|into)\s+(?:°|degrees?\s*)?"
+    rf"(celsius|fahrenheit|kelvin|c|f|k)\s*[?.!]*\s*$",
+    re.IGNORECASE,
+)
+
+
+def _unit_key(word: str) -> str:
+    w = word.lower()
+    return w[:-1] if w.endswith("s") and w[:-1] in _UNITS else w
+
+
+def _convert(prompt: str) -> str | None:
+    m = _TEMP_RE.match(prompt)
+    if m:
+        x = float(m.group(1))
+        src, dst = m.group(2).lower()[0], m.group(3).lower()[0]
+        if src == dst:
+            return _fmt_num(x)
+        as_c = {"c": x, "f": (x - 32) * 5 / 9, "k": x - 273.15}[src]
+        out = {"c": as_c, "f": as_c * 9 / 5 + 32, "k": as_c + 273.15}[dst]
+        return _fmt_num(round(out, 2))
+    m = _CONVERT_RE.match(prompt)
+    if not m:
+        return None
+    src, dst = _unit_key(m.group(2)), _unit_key(m.group(3))
+    if src not in _UNITS or dst not in _UNITS or src == dst:
+        return None
+    (f_src, dim_src), (f_dst, dim_dst) = _UNITS[src], _UNITS[dst]
+    if dim_src != dim_dst:
+        return None  # cross-dimension: defer, never guess
+    value = float(m.group(1)) * f_src / f_dst
+    return _fmt_num(round(value, 4))
+
+
 # ---------------------------------------------------------------- strings & counting
 
 _QUOTED = r"['\"‘’“”]"
@@ -255,15 +437,39 @@ def _reverse(prompt: str) -> str | None:
 
 # ---------------------------------------------------------------- entry point
 
+_ALPHA_SORT_RE = re.compile(
+    r"^\s*(?:arrange|sort|put|list)\s+(?:the\s+(?:following\s+)?words?\s+)?"
+    r"(?:in(?:to)?\s+)?alphabetical\s+order\s*[:\s]+([\w\s,'-]+?)\s*[?.!]*\s*$",
+    re.IGNORECASE,
+)
+
+
+def _alpha_sort(prompt: str) -> str | None:
+    m = _ALPHA_SORT_RE.match(prompt)
+    if not m:
+        return None
+    words = [w.strip().strip("'\"") for w in re.split(r",|\band\b", m.group(1)) if w.strip()]
+    if len(words) < 2 or any(" " in w for w in words):
+        return None
+    return ", ".join(sorted(words, key=str.lower))
+
+
 _HANDLERS = (
     _arithmetic,
     _percent_of,
+    _percent_change,
+    _list_stats,
+    _gcd_lcm,
+    _factorial,
+    _root,
+    _convert,
     _day_of_week,
     _days_between,
     _date_offset,
     _count_letter,
     _count_kind,
     _reverse,
+    _alpha_sort,
 )
 
 
