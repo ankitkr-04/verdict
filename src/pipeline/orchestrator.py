@@ -24,6 +24,7 @@ from src.routing.dispatcher import Dispatcher
 from src.routing.prompt_compression import build_escalation_user
 from src.solvers import make_solvers
 from src.solvers.base import SolveContext
+from src.solvers.deterministic import try_deterministic
 
 log = logging.getLogger("verdict.orchestrator")
 
@@ -41,7 +42,7 @@ async def run(tasks: list[Task], writer: ResultsWriter) -> None:
         str(config.local.get("backend", "llama")),
         str(config.remote.get("backend", "fireworks")),
     )
-    dispatcher = Dispatcher(config)
+    dispatcher = Dispatcher()
 
     pending = len(tasks)
     ctx = SolveContext(
@@ -60,10 +61,20 @@ async def run(tasks: list[Task], writer: ResultsWriter) -> None:
             dispatch_ms = 0
             try:
                 async with asyncio.timeout(budget.task_deadline_s()):
-                    category, method = await dispatcher.classify(task.prompt, local)
-                    dispatch_ms = int((budget.elapsed() - t_start) * 1000)
-                    result = await solvers[category].solve(task)
-                    result.detail = f"dispatch={method}; {result.detail}".strip("; ")
+                    # Deterministic answer-lane first: trivial computables (3*9, day-of-week,
+                    # vowel count) are answered with zero model calls and never even classify.
+                    det = try_deterministic(task.prompt)
+                    if det is not None:
+                        result = SolveResult(
+                            task_id=task.task_id, answer=det, category=Category.MATH,
+                            route=Route.DETERMINISTIC, confidence=1.0,
+                            detail="exact-match handler",
+                        )
+                    else:
+                        category, method = await dispatcher.classify(task.prompt, local)
+                        dispatch_ms = int((budget.elapsed() - t_start) * 1000)
+                        result = await solvers[category].solve(task)
+                        result.detail = f"dispatch={method}; {result.detail}".strip("; ")
             except TimeoutError:
                 result = SolveResult(
                     task_id=task.task_id, answer="", category=Category.FACTUAL,

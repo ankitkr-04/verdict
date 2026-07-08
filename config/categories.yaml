@@ -1,18 +1,12 @@
-# Per-category policy: dispatch rules, local prompts, sampling, verification, escalation.
+# Per-category policy: local prompts, sampling, verification, escalation.
 # This file is the single place task behavior is tuned — solvers read it, never hardcode.
 #
-# Dispatch scoring: each keyword hit = +1, each regex pattern hit = +2 (word-boundary,
-# case-insensitive). Highest score wins; score < min_score -> local-LLM classify fallback.
+# Classification is LLM-first (src/routing/dispatcher.py): the local model names the
+# category. Trivial computables are answered even earlier by the deterministic lane.
+# No regex/keyword dispatch here — it was brittle on nuance and local tokens are free.
 #
 # Local answers cost 0 tokens; local max_tokens exist only to bound wall-clock on CPU.
 # Remote max_tokens directly cap scored Fireworks completion tokens — keep tight.
-
-dispatch:
-  min_score: 2
-  llm_fallback: true          # ambiguous -> one tiny free local classification call
-  # Tie-break order when specific categories score equal (more specific wins).
-  # Factual never competes heuristically — it is the catch-all fallback.
-  priority: [code_debug, ner, summarize, sentiment, math, logic, code_gen]
 
 defaults:
   temperature: 0.7   # Qwen3.5 instruct general rec; greedy decoding degrades this family
@@ -32,17 +26,6 @@ categories:
   # executor computes the answer, so the model never does mental arithmetic or
   # calendar math (its weakest skills).
   math:
-    dispatch:
-      keywords: [calculate, compute, sum, total, average, mean, median, percent, percentage,
-                 profit, interest, price, cost, speed, distance, probability, ratio, fraction,
-                 convert, conversion, celsius, fahrenheit, kilometers, miles, liters,
-                 gallons, ounces, kilograms, gcd, lcm, factorial, remainder, divisible]
-      patterns: ['\d+\s*%', '\d+\s*[+\-*/^]\s*\d+', 'how (?:many|much)', '\bif .*\d+.*\bhow\b',
-                 'day of the week', 'how many days .*between', '\d+\s*days?\s*(?:after|before|from|later)',
-                 'what date', 'convert .*\d.* to', 'how many (?:letters|vowels|consonants|characters|words|times)',
-                 'reverse (?:the )?(?:string|word|letters)', 'spelled backwards?', 'alphabetical order',
-                 '(?:square|cube) root', 'common (?:divisor|factor|multiple)',
-                 'percent(?:age)? (?:increase|decrease|change)']
     solver: math
     verifier: pyexec_math
     prompt:
@@ -52,7 +35,8 @@ categories:
         Never compute in your head — always let the code compute. Use the datetime module
         for any date or weekday question. Output ONLY a fenced python code block.
         The code must be self-contained, use only the standard library, and end with a
-        single print() of the final answer.
+        single print() of the final answer. Do NOT round or truncate unless the problem
+        explicitly asks — print the exact value (e.g. 137.5, not 138).
       user: "{prompt}"
       repair: |-
         {prompt}
@@ -73,10 +57,6 @@ categories:
       max_tokens: 40
 
   code_gen:
-    dispatch:
-      keywords: [function, implement, "write a", python, javascript, class, method,
-                 algorithm, return, parameter]
-      patterns: ['write (?:a|an|the) .*function', 'def \w+', 'implement .*(?:function|class|method)']
     solver: code_gen
     verifier: code_gen
     prompt:
@@ -106,11 +86,6 @@ categories:
       max_tokens: 350
 
   code_debug:
-    dispatch:
-      keywords: [bug, buggy, fix, debug, error, exception, traceback, incorrect, broken,
-                 "doesn't work", crashes]
-      patterns: ['fix (?:the|this) (?:bug|code|function|error)', 'why .*(?:fail|error|wrong)',
-                 'following code .*(?:bug|error|wrong|incorrect)']
     solver: code_debug
     verifier: code_debug
     prompt:
@@ -136,10 +111,6 @@ categories:
       max_tokens: 350
 
   ner:
-    dispatch:
-      keywords: [entities, entity, extract, "named entity", ner, "label each", identify]
-      patterns: ['extract .*(?:entities|names|people|organizations|locations|dates)',
-                 '(?:person|organization|location|date).*(?:person|organization|location|date)']
     solver: ner
     verifier: ner
     entity_types: [PERSON, ORG, LOCATION, DATE]
@@ -168,13 +139,6 @@ categories:
       max_tokens: 250
 
   summarize:
-    dispatch:
-      # Summarize needs an explicit CONDENSE intent. A bare length constraint like
-      # "answer in one sentence" or "in 20 words" is an output-format instruction on
-      # some OTHER task (a logic proof, a factual explanation) and must NOT route here
-      # — that misrouting sent logic/factual prompts to the summarizer.
-      keywords: [summary, tldr, "key points"]
-      patterns: ['summari[sz]e', '\b(?:condense|shorten|recap)\b', 'bullet points?', 'tl;?dr']
     solver: summarize
     verifier: summary_constraints
     prompt:
@@ -198,11 +162,6 @@ categories:
       max_tokens: 200
 
   sentiment:
-    dispatch:
-      keywords: [sentiment, positive, negative, neutral, tone, opinion, review, feeling,
-                 attitude, classify]
-      patterns: ['sentiment of', 'classify .*(?:sentiment|tone|review)',
-                 '(?:positive|negative|neutral).*(?:positive|negative|neutral)']
     solver: sentiment
     verifier: label_agreement
     labels: [positive, negative, neutral, mixed]
@@ -225,11 +184,6 @@ categories:
       max_tokens: 60
 
   logic:
-    dispatch:
-      keywords: [puzzle, riddle, deduce, deduction, constraint, seating, schedule, "who is",
-                 truth, liar, "left of", "next to", older, younger, "each person"]
-      patterns: ['if .* then .*', '\b(?:alice|bob|carol|dave)\b.*\b(?:alice|bob|carol|dave)\b',
-                 'which of the following must', 'exactly one of']
     solver: logic
     verifier: majority
     prompt:

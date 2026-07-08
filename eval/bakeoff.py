@@ -35,7 +35,6 @@ from src.core.config import CategoryPolicy, load_config
 from src.core.parsing import extract_code_block, parse_summary_constraint
 from src.core.schemas import Category
 from src.llm.openai_compat import chat_completion
-from src.routing.dispatcher import Dispatcher
 from src.routing.prompt_compression import build_escalation_user
 from src.verification.checks import check_summary, code_parses, validate_entities
 
@@ -57,14 +56,31 @@ def _load_dotenv() -> None:
             os.environ.setdefault(key.strip(), value.strip().strip("'\""))
 
 
-def classify(dispatcher: Dispatcher, prompt: str) -> Category:
-    """Heuristic-only classification (no local LLM in this offline tool)."""
-    scores = dispatcher.score(prompt)
-    specific = {c: s for c, s in scores.items() if c is not Category.FACTUAL}
-    best = max(specific.values(), default=0)
-    if best >= 2:
-        leaders = [c for c, s in specific.items() if s == best]
-        return min(leaders, key=dispatcher._rank)  # noqa: SLF001 — offline tool
+# Self-contained category guess for this offline tool — production routing is now
+# LLM-first (no local model here), so bakeoff honors an explicit per-task `category`
+# field and otherwise falls back to a tiny keyword map to pick the escalation prompt.
+_CATEGORY_HINTS: tuple[tuple[Category, tuple[str, ...]], ...] = (
+    (Category.CODE_DEBUG, ("fix the bug", "fix this", "debug", "traceback", "crashes", "why does")),
+    (Category.CODE_GEN, ("write a function", "write a python", "implement", "def ", "write a program")),
+    (Category.NER, ("named entit", "entities", "extract all", "extract the")),
+    (Category.SUMMARIZE, ("summarize", "summarise", "condense", "tl;dr", "one sentence", "in at most")),
+    (Category.SENTIMENT, ("sentiment", "positive, negative", "tone of", "how does the reviewer")),
+    (Category.LOGIC, ("puzzle", "deduce", "if all", "who sits", "who is", "conclude", "must be true")),
+    (Category.MATH, ("calculate", "compute", "how many", "how much", "what is", "%", "percent")),
+)
+
+
+def guess_category(task: dict) -> Category:
+    explicit = task.get("category")
+    if explicit:
+        try:
+            return Category(str(explicit))
+        except ValueError:
+            pass
+    text = (task.get("prompt") or "").lower()
+    for cat, hints in _CATEGORY_HINTS:
+        if any(h in text for h in hints):
+            return cat
     return Category.FACTUAL
 
 
@@ -159,14 +175,13 @@ async def main() -> int:
         return 2
     tasks = json.loads(args.tasks.read_text(encoding="utf-8"))
     config = load_config()
-    dispatcher = Dispatcher(config)
     system = str(config.remote.get("system", "")).strip()
 
     sem = asyncio.Semaphore(args.concurrency)
     async with httpx.AsyncClient(timeout=httpx.Timeout(_TIMEOUT_S, connect=10.0)) as client:
         jobs = []
         for task in tasks:
-            category = classify(dispatcher, task["prompt"])
+            category = guess_category(task)
             policy = config.policy(category)
             for model in models:
                 jobs.append(probe(client, sem, model=model, task=task,

@@ -52,8 +52,6 @@ class CategoryPolicy:
     theta: float = 0.55
     answer_format: str = "{answer}"
     escalate: EscalatePolicy = field(default_factory=EscalatePolicy)
-    dispatch_keywords: list[str] = field(default_factory=list)
-    dispatch_patterns: list[str] = field(default_factory=list)
     extra: dict[str, Any] = field(default_factory=dict)
 
     def extra_num(self, key: str, default: float) -> float:
@@ -65,7 +63,7 @@ class CategoryPolicy:
 
 _POLICY_KEYS = {
     "solver", "verifier", "prompt", "temperature", "max_tokens", "n_samples",
-    "repair_attempts", "thinking", "theta", "answer_format", "escalate", "dispatch",
+    "repair_attempts", "thinking", "theta", "answer_format", "escalate",
 }
 
 
@@ -73,7 +71,6 @@ def _build_policy(name: str, raw: dict[str, Any], defaults: dict[str, Any]) -> C
     merged: dict[str, Any] = {**defaults, **raw}
     esc_raw = {**defaults.get("escalate", {}), **(raw.get("escalate") or {})}
     prompt = merged.get("prompt") or {}
-    dispatch = merged.get("dispatch") or {}
     extra = {k: v for k, v in raw.items() if k not in _POLICY_KEYS}
     return CategoryPolicy(
         name=Category(name),
@@ -95,8 +92,6 @@ def _build_policy(name: str, raw: dict[str, Any], defaults: dict[str, Any]) -> C
             max_tokens=int(esc_raw.get("max_tokens", 200)),
             temperature=float(esc_raw.get("temperature", 0.0)),
         ),
-        dispatch_keywords=[str(k).lower() for k in dispatch.get("keywords", [])],
-        dispatch_patterns=[str(p) for p in dispatch.get("patterns", [])],
         extra=extra,
     )
 
@@ -106,9 +101,6 @@ class Config:
     local: dict[str, Any]
     remote: dict[str, Any]
     categories: dict[Category, CategoryPolicy]
-    dispatch_min_score: int
-    dispatch_llm_fallback: bool
-    dispatch_priority: list[Category]
     calibration: dict[str, dict[str, float]]
 
     def policy(self, category: Category) -> CategoryPolicy:
@@ -129,7 +121,6 @@ def load_config() -> Config:
     models = _load_yaml(settings.MODELS_YAML)
     cats_raw = _load_yaml(settings.CATEGORIES_YAML)
     defaults = cats_raw.get("defaults") or {}
-    dispatch = cats_raw.get("dispatch") or {}
 
     categories: dict[Category, CategoryPolicy] = {}
     for name, raw in (cats_raw.get("categories") or {}).items():
@@ -147,8 +138,5 @@ def load_config() -> Config:
         local=models.get("local") or {},
         remote=models.get("remote") or {},
         categories=categories,
-        dispatch_min_score=int(dispatch.get("min_score", 2)),
-        dispatch_llm_fallback=bool(dispatch.get("llm_fallback", True)),
-        dispatch_priority=[Category(c) for c in dispatch.get("priority", [])],
         calibration=calibration,
     )

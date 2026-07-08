@@ -19,7 +19,7 @@ import threading
 
 from src.core import settings
 from src.core.config import load_config
-from src.core.schemas import Task
+from src.core.schemas import Category, Route, SolveResult, Task
 from src.llm.local_llm import make_local
 from src.llm.local_server import ensure_local_server
 from src.llm.remote_llm import make_remote
@@ -27,6 +27,7 @@ from src.routing.budget import Budget
 from src.routing.dispatcher import Dispatcher
 from src.solvers import make_solvers
 from src.solvers.base import SolveContext
+from src.solvers.deterministic import try_deterministic
 
 _SOLVE_TIMEOUT_S = 120.0
 _INIT_TIMEOUT_S = 90.0  # may include a llama-server spawn + model load
@@ -81,7 +82,7 @@ class Playground:
         config = load_config()
         self._local = make_local(config.local)
         self._remote = make_remote(config.remote)
-        self._dispatcher = Dispatcher(config)
+        self._dispatcher = Dispatcher()
         self._server = await ensure_local_server(config.local)
         await self._local.wait_ready(settings.LOCAL_READY_TIMEOUT_S)
         if hasattr(self._local, "warmup"):
@@ -99,8 +100,16 @@ class Playground:
         solvers = make_solvers(ctx)
         task = Task(task_id=f"play-{next(self._ids)}", prompt=prompt)
         async with asyncio.timeout(_SOLVE_TIMEOUT_S):
-            category, method = await self._dispatcher.classify(prompt, self._local)
-            result = await solvers[category].solve(task)
+            det = try_deterministic(prompt)
+            if det is not None:
+                method = "deterministic"
+                result = SolveResult(
+                    task_id=task.task_id, answer=det, category=Category.MATH,
+                    route=Route.DETERMINISTIC, confidence=1.0, detail="exact-match handler",
+                )
+            else:
+                category, method = await self._dispatcher.classify(prompt, self._local)
+                result = await solvers[category].solve(task)
         return {
             "answer": result.answer,
             "category": result.category.value,
