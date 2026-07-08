@@ -8,7 +8,11 @@ local:
   # served model exactly — set VERDICT_LOCAL_MODEL when pointing at vllm serve.
   model: ${VERDICT_LOCAL_MODEL:-local}
   slots: ${VERDICT_LOCAL_SLOTS:-4}                # must match llama-server --parallel
-  timeout_s: 20
+  # HTTP read timeout for a local generation. The local model is FREE — the real cap
+  # on local work is the per-task asyncio deadline (VERDICT_TASK_CEILING_S). This must
+  # stay >= that deadline, or httpx abandons a still-running generation early, leaving
+  # the llama-server slot busy (zombie) and backing up the queue → cascading timeouts.
+  timeout_s: ${VERDICT_LOCAL_TIMEOUT_S:-120}
   logprobs: true
   # Appended to the user message when a category has thinking disabled.
   # Qwen3.5 Small ships with reasoning OFF by default, so nothing is needed.
