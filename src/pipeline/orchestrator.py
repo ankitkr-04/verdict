@@ -29,6 +29,43 @@ from src.solvers.deterministic import try_deterministic
 log = logging.getLogger("verdict.orchestrator")
 
 _INSURANCE_CONF = 0.9
+_LAST_RESORT_TEXT = "Unable to determine a reliable answer."
+
+
+async def _answer_after_deadline(task: Task, ctx: SolveContext, budget: Budget) -> SolveResult:
+    """A task that hit its per-task deadline must STILL get an answer — never drop a
+    prompt. The 10-min budget is TOTAL and the per-task cap is a safety limit, so on
+    timeout we spend one fast, tightly-capped remote call within the time left; only if
+    even that can't run do we ship a non-empty placeholder. Remote is ~10x faster than
+    CPU-local, so this reliably beats the deadline it was triggered by.
+    """
+    left = budget.remaining() - settings.FINAL_FLUSH_RESERVE_S
+    if left <= 1.5:
+        return SolveResult(
+            task_id=task.task_id, answer=_LAST_RESORT_TEXT, category=Category.FACTUAL,
+            route=Route.ERROR, detail="deadline exceeded; no time left to escalate",
+        )
+    try:
+        t0 = budget.elapsed()
+        async with asyncio.timeout(min(10.0, left)):
+            resp = await ctx.remote.complete(
+                build_escalation_user(task.prompt, "Answer concisely and correctly."),
+                max_tokens=100, temperature=0.0, category="factual",
+            )
+        ans = resp.text.strip()
+        return SolveResult(
+            task_id=task.task_id, answer=ans or _LAST_RESORT_TEXT, category=Category.FACTUAL,
+            route=Route.ESCALATED if ans else Route.ERROR, confidence=0.8 if ans else 0.0,
+            remote_calls=1, remote_prompt_tokens=resp.prompt_tokens,
+            remote_completion_tokens=resp.completion_tokens,
+            remote_ms=int((budget.elapsed() - t0) * 1000),
+            detail="local deadline exceeded -> fast remote answer",
+        )
+    except (TimeoutError, RemoteError) as e:
+        return SolveResult(
+            task_id=task.task_id, answer=_LAST_RESORT_TEXT, category=Category.FACTUAL,
+            route=Route.ERROR, detail=f"deadline exceeded; remote fallback failed: {e!r}",
+        )
 
 
 async def run(tasks: list[Task], writer: ResultsWriter) -> None:
@@ -76,10 +113,8 @@ async def run(tasks: list[Task], writer: ResultsWriter) -> None:
                         result = await solvers[category].solve(task)
                         result.detail = f"dispatch={method}; {result.detail}".strip("; ")
             except TimeoutError:
-                result = SolveResult(
-                    task_id=task.task_id, answer="", category=Category.FACTUAL,
-                    route=Route.ERROR, detail="task deadline exceeded",
-                )
+                # Per-task deadline hit — never drop the prompt: fast remote answer.
+                result = await _answer_after_deadline(task, ctx, budget)
             except Exception as e:  # noqa: BLE001 — one task must never sink the run
                 log.exception("task %s crashed", task.task_id)
                 result = SolveResult(
