@@ -4,7 +4,9 @@
 local:
   backend: ${VERDICT_LOCAL_BACKEND:-llama}        # llama | mock
   base_url: ${VERDICT_LOCAL_BASE_URL:-http://127.0.0.1:8080/v1}
-  model: local                                    # llama-server serves one model; name is cosmetic
+  # llama-server ignores the name; vLLM (hackathon pod) requires it to match the
+  # served model exactly — set VERDICT_LOCAL_MODEL when pointing at vllm serve.
+  model: ${VERDICT_LOCAL_MODEL:-local}
   slots: ${VERDICT_LOCAL_SLOTS:-4}                # must match llama-server --parallel
   timeout_s: 20
   logprobs: true
@@ -28,7 +30,9 @@ remote:
   # exactly one call per escalation to the first ALLOWED_MODELS entry matching a
   # pattern (case-insensitive). No match -> `prefer` -> first allowed model.
   # Only models from ALLOWED_MODELS are ever called (rule compliance).
-  prefer: "${VERDICT_REMOTE_PREFER:-}"            # comma-separated global fallback order
+  # Preferences are supplied via env only (.env in dev, -e flags in Docker) so no
+  # model-name strings live in the public repo; empty -> first ALLOWED_MODELS entry.
+  prefer: "${VERDICT_REMOTE_PREFER:-}"
   category_prefer:                                # per-category, filled from bake-off results
     math: "${VERDICT_PREFER_MATH:-}"
     logic: "${VERDICT_PREFER_LOGIC:-}"
