@@ -45,6 +45,12 @@ class LlamaLocal:
         self.model = str(cfg.get("model", "local"))
         self.logprobs = bool(cfg.get("logprobs", True))
         self.no_think_suffix = str(cfg.get("no_think_suffix", ""))
+        # Qwen3.5's chat template defaults to thinking ON; disable it so real content
+        # isn't crowded out (or truncated) by hidden reasoning. Sent as
+        # chat_template_kwargs, which both llama.cpp and vLLM honor.
+        self.extra_body: dict[str, Any] = {}
+        if str(cfg.get("enable_thinking", "false")).strip().lower() not in ("1", "true", "yes", "on"):
+            self.extra_body["chat_template_kwargs"] = {"enable_thinking": False}
         # Model-family sampling defaults (Qwen3.5 card: top_p/top_k/min_p/presence_penalty).
         self.sampling = {
             k: float(v) for k, v in (cfg.get("sampling") or {}).items()
@@ -66,6 +72,7 @@ class LlamaLocal:
                     system=system, user=user, temperature=temperature,
                     max_tokens=max_tokens, stop=stop, logprobs=self.logprobs,
                     sampling={**self.sampling, **(sampling or {})},
+                    extra_body=self.extra_body or None,
                 )
             except (httpx.HTTPError, KeyError, ValueError) as e:
                 raise LocalError(f"local generation failed: {e!r}") from e

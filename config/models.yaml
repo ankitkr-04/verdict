@@ -14,6 +14,12 @@ local:
   # the llama-server slot busy (zombie) and backing up the queue → cascading timeouts.
   timeout_s: ${VERDICT_LOCAL_TIMEOUT_S:-120}
   logprobs: true
+  # Qwen3.5 GGUF ships with THINKING ON in its chat template: on harder tasks it spends
+  # the whole token budget on hidden <think> reasoning and returns empty/truncated
+  # content, forcing needless escalations. Disable it via the chat-template kwarg
+  # (honored by llama.cpp AND vLLM); the "/no_think" text suffix does NOT work here.
+  # Boolean, not raw JSON, to avoid a ${VAR:-{...}} brace-expansion hazard.
+  enable_thinking: ${VERDICT_LOCAL_ENABLE_THINKING:-false}
   # Appended to the user message when a category has thinking disabled.
   # Qwen3.5 Small ships with reasoning OFF by default, so nothing is needed.
   # Running an older Qwen3 instead? Set this back to " /no_think".
