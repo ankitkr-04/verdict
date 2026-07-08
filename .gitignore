@@ -51,5 +51,6 @@ Thumbs.db
 CLAUDE.md
 agents/
 .agents/
+.claude/
 # ---- private working docs (never committed) ----
 private/
