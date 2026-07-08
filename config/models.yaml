@@ -23,11 +23,27 @@ local:
 
 remote:
   backend: ${VERDICT_REMOTE_BACKEND:-fireworks}   # fireworks | mock
-  # Substring preference order, matched case-insensitively against ALLOWED_MODELS.
-  # First match wins; no match -> first allowed model. Gemma first = side-prize bias.
-  prefer: ["gemma"]
+  # Model choice is decided OFFLINE (eval/bakeoff.py with your own key), then frozen
+  # here as substring preferences — the judged run never explores/cascades, it makes
+  # exactly one call per escalation to the first ALLOWED_MODELS entry matching a
+  # pattern (case-insensitive). No match -> `prefer` -> first allowed model.
+  # Only models from ALLOWED_MODELS are ever called (rule compliance).
+  prefer: "${VERDICT_REMOTE_PREFER:-}"            # comma-separated global fallback order
+  category_prefer:                                # per-category, filled from bake-off results
+    math: "${VERDICT_PREFER_MATH:-}"
+    logic: "${VERDICT_PREFER_LOGIC:-}"
+    code_gen: "${VERDICT_PREFER_CODE_GEN:-}"
+    code_debug: "${VERDICT_PREFER_CODE_DEBUG:-}"
+    factual: "${VERDICT_PREFER_FACTUAL:-}"
+    summarize: "${VERDICT_PREFER_SUMMARIZE:-}"
+    sentiment: "${VERDICT_PREFER_SENTIMENT:-}"
+    ner: "${VERDICT_PREFER_NER:-}"
   timeout_s: 25
   max_retries: 1
   retry_backoff_s: 1.0
   # Byte-identical system prefix on every remote call -> Fireworks prompt-cache discount.
   system: "Answer directly and correctly. No preamble."
+  # Raw JSON merged into every remote request body — day-of escape hatch, e.g.
+  # '{"response_format": {"type": "json_object"}}' or a reasoning-effort knob to stop
+  # a reasoning model from billing hidden thinking tokens as completion tokens.
+  extra_body_json: "${VERDICT_REMOTE_EXTRA_BODY:-}"

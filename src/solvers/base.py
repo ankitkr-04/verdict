@@ -168,6 +168,7 @@ class BaseSolver(ABC):
                 user,
                 max_tokens=self.policy.escalate.max_tokens,
                 temperature=self.policy.escalate.temperature,
+                category=self.policy.name.value,
             )
             remote_ms = int((time.monotonic() - t_remote) * 1000)
             answer = self.post_remote(task, resp.text)

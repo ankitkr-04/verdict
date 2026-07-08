@@ -147,6 +147,7 @@ async def _ensure_remote_usage(
             build_escalation_user(task.prompt, policy.escalate.instruction),
             max_tokens=policy.escalate.max_tokens,
             temperature=policy.escalate.temperature,
+            category=target.category.value,
         )
         answer = resp.text.strip()
         if answer:
