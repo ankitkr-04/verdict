@@ -169,9 +169,12 @@ categories:
 
   summarize:
     dispatch:
-      keywords: [summarize, summarise, summary, condense, shorten, tldr, "key points"]
-      patterns: ['in (?:one|two|three|\d+) sentences?', 'in (?:under |at most )?\d+ words',
-                 'bullet points?']
+      # Summarize needs an explicit CONDENSE intent. A bare length constraint like
+      # "answer in one sentence" or "in 20 words" is an output-format instruction on
+      # some OTHER task (a logic proof, a factual explanation) and must NOT route here
+      # — that misrouting sent logic/factual prompts to the summarizer.
+      keywords: [summary, tldr, "key points"]
+      patterns: ['summari[sz]e', '\b(?:condense|shorten|recap)\b', 'bullet points?', 'tl;?dr']
     solver: summarize
     verifier: summary_constraints
     prompt:

@@ -13,9 +13,14 @@ _PATTERN_SCORE = 2
 _CLASSIFY_SNIPPET_CHARS = 500
 
 _CLASSIFY_USER = (
-    "Classify this task. Reply with exactly one word from: {options}. "
-    "Use math for anything computable: arithmetic, dates, counting, unit conversion."
-    "\n\nTask: {snippet}"
+    "Classify this task into exactly one category word from: {options}.\n"
+    "- math: anything computable — arithmetic, dates, counting, unit conversion.\n"
+    "- sentiment: ONLY when judging the emotional tone of a GIVEN piece of text.\n"
+    "- summarize: ONLY when shortening or condensing GIVEN text.\n"
+    "- ner: ONLY when extracting named entities from text.\n"
+    "- factual: open questions, explanations, definitions, opinions, or comparisons "
+    "(e.g. 'is X better than Y') — and anything that fits nothing else.\n"
+    "Reply with one word only.\n\nTask: {snippet}"
 )
 
 
