@@ -1,0 +1,4 @@
+# Chat UI + telemetry sidebar (streamlit run src/frontend/app.py).
+# Dev/demo only — never installed in the container image.
+-r requirements.txt
+streamlit==1.59.0
