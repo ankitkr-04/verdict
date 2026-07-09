@@ -103,7 +103,10 @@ LLAMA_MODEL_PATH = os.environ.get("LLAMA_MODEL_PATH")  # explicit weights (conta
 # (2048-4096). Quantizing the KV cache (LLAMA_CACHE_TYPE_*=q8_0) buys more RAM headroom
 # but the V cache needs flash-attn. The dev GPU box can raise all of these via env.
 LLAMA_CTX = _env_int("LLAMA_CTX", 4096)
-LLAMA_PARALLEL = _env_int("LLAMA_PARALLEL", 2)  # keep aligned with TASK_CONCURRENCY
+# Serial on CPU: measured on the 2-thread box, concurrency=2 split the cores and drove
+# every task to the 25 s ceiling (22/29 escalated); concurrency=1 gives each task the
+# full cores — p50 halved to 10 s and escalations dropped to 14. Keep both at 1.
+LLAMA_PARALLEL = _env_int("LLAMA_PARALLEL", 1)  # keep aligned with TASK_CONCURRENCY
 LLAMA_THREADS = _env_int("LLAMA_THREADS", os.cpu_count() or 4)
 LLAMA_NGL = _env_int("LLAMA_NGL", 99)  # GPU layers; harmless no-op on CPU builds
 LLAMA_CACHE_TYPE_K = _env("LLAMA_CACHE_TYPE_K", "")  # e.g. q8_0; empty -> f16 default

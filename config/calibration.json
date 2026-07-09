@@ -1,6 +1,6 @@
 {
-  "_comment": "Platt scaling per category: p = 1 / (1 + exp(A*s + B)) where s = mean token logprob of the local answer. Overwritten by eval/calibrate.py from labeled mock runs; these are conservative uncalibrated defaults. theta = minimum calibrated confidence to accept a local answer without escalation.",
-  "default": { "A": -3.0, "B": -0.5, "theta": 0.55 },
-  "factual": { "A": -3.0, "B": -0.5, "theta": 0.6 },
-  "logic":   { "A": -3.0, "B": -0.5, "theta": 0.6 }
+  "_comment": "Platt scaling per category: p = 1 / (1 + exp(A*s + B)) where s = mean token logprob of the local answer. Overwritten by eval/calibrate.py from labeled mock runs. Constants below are anchored to Qwen3-4B-Instruct-2507 measured on the CPU box (hard set, 2026-07-09): correct local answers scored s in [-0.21, -0.05]; this curve maps s=-0.10 -> 0.73, s=-0.15 -> 0.65, s=-0.20 -> 0.55, s=-0.30 -> 0.35, so clearly-confident answers pass theta while shaky ones still escalate. The previous A=-3/B=-0.5 defaults mapped even a PERFECT logprob (0.0) to 0.62 -- barely over theta -- rejecting near-certain answers and leaking remote tokens. theta = minimum calibrated confidence to accept a local answer without escalation.",
+  "default": { "A": -8.0, "B": -1.8, "theta": 0.55 },
+  "factual": { "A": -8.0, "B": -1.8, "theta": 0.6 },
+  "logic":   { "A": -8.0, "B": -1.8, "theta": 0.6 }
 }

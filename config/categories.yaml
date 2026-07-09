@@ -7,6 +7,10 @@
 #
 # Local answers cost 0 tokens; local max_tokens exist only to bound wall-clock on CPU.
 # Remote max_tokens directly cap scored Fireworks completion tokens — keep tight.
+#
+# CPU sizing (grading box = 2 vCPU, ~15 tok/s at 4B Q4): the per-task ceiling is 25 s,
+# so n_samples x max_tokens must stay under ~300 generated tokens per task. Settings
+# above that (e.g. logic 3x600, code 500) were GPU-era and guaranteed CPU timeouts.
 
 defaults:
   temperature: 0.7   # Qwen3.5 instruct general rec; greedy decoding degrades this family
@@ -37,6 +41,7 @@ categories:
         The code must be self-contained, use only the standard library, and end with a
         single print() of the final answer. Do NOT round or truncate unless the problem
         explicitly asks — print the exact value (e.g. 137.5, not 138).
+        Keep the code minimal: no comments, no blank lines, no alternatives.
       user: "{prompt}"
       repair: |-
         {prompt}
@@ -48,7 +53,7 @@ categories:
         It failed with: {feedback}
         Output ONLY a corrected fenced python code block ending with one print() of the answer.
     temperature: 0.7
-    max_tokens: 300
+    max_tokens: 260
     n_samples: 1
     repair_attempts: 1
     answer_format: "{answer}"
@@ -62,7 +67,8 @@ categories:
     prompt:
       system: >-
         You write correct, clean Python. Output ONLY one fenced python code block with the
-        requested function (plus imports if needed). No usage examples, no explanations.
+        requested function (plus imports if needed). No usage examples, no explanations,
+        no comments — the shortest correct implementation.
       user: "{prompt}"
       repair: |-
         {prompt}
@@ -79,19 +85,20 @@ categories:
         Output ONLY a fenced python code block containing assert lines. If the task gives
         no checkable examples, output a block containing only: pass
     temperature: 0.7
-    max_tokens: 500
+    max_tokens: 320
     repair_attempts: 1
     escalate:
       instruction: "Output only the requested function as code. No explanation."
-      max_tokens: 350
+      max_tokens: 300
 
   code_debug:
     solver: code_debug
     verifier: code_debug
     prompt:
       system: >-
-        You fix bugs. Identify the bug, then output the FULL corrected code in ONE fenced
-        python code block. Before the block, state the bug in one short sentence.
+        You fix bugs. State the bug in one short sentence, then output the FULL corrected
+        code in ONE fenced python code block. No comments, no explanation beyond that
+        sentence.
       user: "{prompt}"
       repair: |-
         {prompt}
@@ -103,12 +110,12 @@ categories:
         It still fails: {feedback}
         State the bug in one sentence, then output the FULL corrected code in one fenced block.
     temperature: 0.7
-    max_tokens: 500
+    max_tokens: 320
     repair_attempts: 1
     answer_format: "{answer}"
     escalate:
       instruction: "Identify the bug in one sentence, then give the full corrected code."
-      max_tokens: 350
+      max_tokens: 300
 
   ner:
     solver: ner
@@ -129,7 +136,7 @@ categories:
         It was invalid: {feedback}
         Output ONLY the corrected JSON array in the required schema.
     temperature: 0.7
-    max_tokens: 400
+    max_tokens: 250
     n_samples: 2
     repair_attempts: 1
     escalate:
@@ -155,7 +162,7 @@ categories:
         Constraint violation: {feedback}
         Rewrite the summary so it satisfies the constraint exactly. Output only the summary.
     temperature: 0.7
-    max_tokens: 300
+    max_tokens: 250
     repair_attempts: 2
     escalate:
       instruction: "Follow the length/format constraint exactly. Output only the summary."
@@ -188,16 +195,18 @@ categories:
     verifier: majority
     prompt:
       system: >-
-        You solve logic puzzles. Reason step by step briefly, checking every stated
-        constraint. End with one line: "FINAL: <answer>".
+        You solve logic puzzles. Reason step by step in AT MOST 8 short lines, checking
+        every stated constraint. End with one line: "FINAL: <answer>".
       user: "{prompt}"
       repair: >-
         Your answer violated: {feedback}
         Re-solve carefully. End with one line: "FINAL: <answer>".
-    temperature: 1.0   # Qwen3.5 reasoning rec
-    sampling: {top_p: 1.0, top_k: 40, presence_penalty: 2.0}
-    max_tokens: 600
-    n_samples: 3
+    # CPU: one sample within the ceiling beats three that time out. The majority verifier
+    # degrades to calibrated single-sample confidence at n=1; genuinely-hard puzzles the
+    # 4B can't crack should escalate — that is deserved spend, not waste.
+    temperature: 0.7
+    max_tokens: 350
+    n_samples: 1
     majority_min: 2
     thinking: true
     theta: 0.6
@@ -218,7 +227,7 @@ categories:
       user: "{prompt}"
       repair: ""
     temperature: 0.7
-    max_tokens: 220
+    max_tokens: 150
     n_samples: 2
     theta: 0.6
     repair_attempts: 0
