@@ -19,14 +19,15 @@ RUN cmake -S /llama.cpp -B /llama.cpp/build \
     && cmake --build /llama.cpp/build --target llama-server -j"$(nproc)"
 
 # ---------- stage 2: model weights ----------
-# Swap models with build-args, e.g.:
-#   --build-arg MODEL_REPO=unsloth/Qwen3.5-9B-GGUF --build-arg MODEL_FILE=Qwen3.5-9B-UD-Q4_K_XL.gguf
-# or override the full MODEL_URL for non-HF sources.
+# Defaults = the qwen3-4b-2507 profile (see settings.LOCAL_MODEL_PROFILES). To A/B another
+# profile, pass BOTH the weights args and PROFILE, e.g.:
+#   --build-arg MODEL_REPO=unsloth/Phi-4-mini-instruct-GGUF \
+#   --build-arg MODEL_FILE=Phi-4-mini-instruct-Q4_K_M.gguf --build-arg PROFILE=phi4-mini
 FROM python:3.12-slim AS model
 RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates \
     && rm -rf /var/lib/apt/lists/*
-ARG MODEL_REPO=unsloth/Qwen3.5-4B-GGUF
-ARG MODEL_FILE=Qwen3.5-4B-UD-Q4_K_XL.gguf
+ARG MODEL_REPO=unsloth/Qwen3-4B-Instruct-2507-GGUF
+ARG MODEL_FILE=Qwen3-4B-Instruct-2507-Q4_K_M.gguf
 ARG MODEL_URL=https://huggingface.co/${MODEL_REPO}/resolve/main/${MODEL_FILE}
 RUN curl -fL --retry 3 -o /model.gguf "${MODEL_URL}"
 
@@ -46,9 +47,16 @@ COPY main.py ./
 
 # The app manages llama-server itself: finds the binary on PATH, uses the
 # baked weights at LLAMA_MODEL_PATH, spawns and reaps the process.
+# PROFILE must match the baked weights: it sets the thinking/template behaviour
+# (send_think_kwarg etc.) in settings.LOCAL_MODEL_PROFILES.
+# LLAMA_THREADS is pinned to the grading box's 2 vCPU — inside a --cpus-capped
+# container os.cpu_count() still reports the HOST's cores, which would over-thread.
+ARG PROFILE=qwen3-4b-2507
 ENV VERDICT_LOCAL_BACKEND=llama \
     VERDICT_REMOTE_BACKEND=fireworks \
     VERDICT_LOCAL_BASE_URL=http://127.0.0.1:8080/v1 \
-    LLAMA_MODEL_PATH=/models/model.gguf
+    LLAMA_MODEL_PATH=/models/model.gguf \
+    VERDICT_LOCAL_MODEL_PROFILE=${PROFILE} \
+    LLAMA_THREADS=2
 
 ENTRYPOINT ["python", "main.py"]
