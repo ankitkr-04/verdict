@@ -8,9 +8,11 @@
 # Local answers cost 0 tokens; local max_tokens exist only to bound wall-clock on CPU.
 # Remote max_tokens directly cap scored Fireworks completion tokens — keep tight.
 #
-# CPU sizing (grading box = 2 vCPU, ~15 tok/s at 4B Q4): the per-task ceiling is 25 s,
-# so n_samples x max_tokens must stay under ~300 generated tokens per task. Settings
-# above that (e.g. logic 3x600, code 500) were GPU-era and guaranteed CPU timeouts.
+# CPU sizing, measured IN-CONTAINER (--cpus=2, python + llama share the quota):
+# effective generation is ~8-9 tok/s, so with the 25 s task ceiling the whole task —
+# prompt eval + ALL samples — must fit ~180-200 generated tokens. n_samples=2 at that
+# speed is a guaranteed timeout (the 2nd sample never finishes); single-sample +
+# calibrated confidence beats a timed-out escalation everywhere.
 
 defaults:
   temperature: 0.7   # Qwen3.5 instruct general rec; greedy decoding degrades this family
@@ -53,7 +55,7 @@ categories:
         It failed with: {feedback}
         Output ONLY a corrected fenced python code block ending with one print() of the answer.
     temperature: 0.7
-    max_tokens: 260
+    max_tokens: 200
     n_samples: 1
     repair_attempts: 1
     answer_format: "{answer}"
@@ -85,7 +87,7 @@ categories:
         Output ONLY a fenced python code block containing assert lines. If the task gives
         no checkable examples, output a block containing only: pass
     temperature: 0.7
-    max_tokens: 320
+    max_tokens: 240
     repair_attempts: 1
     escalate:
       instruction: "Output only the requested function as code. No explanation."
@@ -110,7 +112,7 @@ categories:
         It still fails: {feedback}
         State the bug in one sentence, then output the FULL corrected code in one fenced block.
     temperature: 0.7
-    max_tokens: 320
+    max_tokens: 240
     repair_attempts: 1
     answer_format: "{answer}"
     escalate:
@@ -136,8 +138,8 @@ categories:
         It was invalid: {feedback}
         Output ONLY the corrected JSON array in the required schema.
     temperature: 0.7
-    max_tokens: 250
-    n_samples: 2
+    max_tokens: 220
+    n_samples: 1
     repair_attempts: 1
     escalate:
       instruction: >-
@@ -184,7 +186,7 @@ categories:
         Reply again: line 1 exactly one label word, line 2 one-sentence justification.
     temperature: 0.7
     max_tokens: 120
-    n_samples: 2
+    n_samples: 1
     repair_attempts: 1
     escalate:
       instruction: "Reply with the sentiment label (Positive/Negative/Neutral/Mixed) and a one-sentence justification."
@@ -205,7 +207,7 @@ categories:
     # degrades to calibrated single-sample confidence at n=1; genuinely-hard puzzles the
     # 4B can't crack should escalate — that is deserved spend, not waste.
     temperature: 0.7
-    max_tokens: 350
+    max_tokens: 200
     n_samples: 1
     majority_min: 2
     thinking: true
@@ -228,7 +230,7 @@ categories:
       repair: ""
     temperature: 0.7
     max_tokens: 150
-    n_samples: 2
+    n_samples: 1
     theta: 0.6
     repair_attempts: 0
     escalate:
