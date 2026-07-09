@@ -35,6 +35,11 @@ RUN curl -fL --retry 3 -o /model.gguf "${MODEL_URL}"
 FROM python:3.12-slim
 WORKDIR /app
 
+# llama-server links OpenMP (libgomp) dynamically — python:slim doesn't ship it and
+# the server dies on startup without it. libstdc++6 belt-and-braces for the same reason.
+RUN apt-get update && apt-get install -y --no-install-recommends libgomp1 libstdc++6 \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY --from=llama-build /llama.cpp/build/bin/llama-server /usr/local/bin/llama-server
 COPY --from=model /model.gguf /models/model.gguf
 

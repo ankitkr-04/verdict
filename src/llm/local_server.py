@@ -118,5 +118,16 @@ async def ensure_local_server(local_cfg: dict[str, Any]) -> LocalServer | None:
     settings.LLAMA_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
     logfile = open(settings.LLAMA_LOG_PATH, "ab")  # noqa: SIM115 — outlives this scope
     proc = subprocess.Popen(cmd, stdout=logfile, stderr=logfile)
+    # Fail fast on instant crashes (missing shared libs, bad flags): otherwise the app
+    # silently polls a dead port until the readiness timeout with no diagnosis.
+    await asyncio.sleep(1.5)
+    if proc.poll() is not None:
+        try:
+            tail = settings.LLAMA_LOG_PATH.read_text(encoding="utf-8", errors="replace")[-500:]
+        except OSError:
+            tail = "<no log>"
+        raise LocalServerError(
+            f"llama-server exited immediately (code {proc.returncode}); log tail:\n{tail}"
+        )
     log.info("spawned llama-server pid=%d (log: %s)", proc.pid, settings.LLAMA_LOG_PATH)
     return LocalServer(proc)
