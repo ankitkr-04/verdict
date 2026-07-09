@@ -7,19 +7,23 @@ local:
   # llama-server ignores the name; vLLM (hackathon pod) requires it to match the
   # served model exactly — set VERDICT_LOCAL_MODEL when pointing at vllm serve.
   model: ${VERDICT_LOCAL_MODEL:-local}
-  slots: ${VERDICT_LOCAL_SLOTS:-4}                # must match llama-server --parallel
+  slots: ${VERDICT_LOCAL_SLOTS:-2}                # must match llama-server --parallel (2 vCPU box)
   # HTTP read timeout for a local generation. The local model is FREE — the real cap
   # on local work is the per-task asyncio deadline (VERDICT_TASK_CEILING_S). This must
   # stay >= that deadline, or httpx abandons a still-running generation early, leaving
   # the llama-server slot busy (zombie) and backing up the queue → cascading timeouts.
   timeout_s: ${VERDICT_LOCAL_TIMEOUT_S:-120}
   logprobs: true
-  # Qwen3.5 GGUF ships with THINKING ON in its chat template: on harder tasks it spends
-  # the whole token budget on hidden <think> reasoning and returns empty/truncated
-  # content, forcing needless escalations. Disable it via the chat-template kwarg
-  # (honored by llama.cpp AND vLLM); the "/no_think" text suffix does NOT work here.
-  # Boolean, not raw JSON, to avoid a ${VAR:-{...}} brace-expansion hazard.
+  # Which local model runs is chosen by VERDICT_LOCAL_MODEL_PROFILE (see
+  # settings.LOCAL_MODEL_PROFILES): qwen3-4b-2507 | phi4-mini | qwen25-3b | qwen35-4b.
+  # Thinking control: a thinking model (qwen35-4b) ships THINKING ON and burns the token
+  # budget on hidden <think> reasoning, returning empty/truncated content — force it OFF
+  # via the chat-template kwarg (honored by llama.cpp AND vLLM; the "/no_think" suffix does
+  # NOT work here). Natively non-thinking models (qwen3-4b-2507, phi4-mini, qwen25-3b) need
+  # no kwarg at all -> send_think_kwarg=false so we don't feed their template an undeclared
+  # variable. Booleans, not raw JSON, to avoid a ${VAR:-{...}} brace-expansion hazard.
   enable_thinking: ${VERDICT_LOCAL_ENABLE_THINKING:-false}
+  send_think_kwarg: ${VERDICT_LOCAL_SEND_THINK_KWARG:-true}
   # Appended to the user message when a category has thinking disabled.
   # Qwen3.5 Small ships with reasoning OFF by default, so nothing is needed.
   # Running an older Qwen3 instead? Set this back to " /no_think".

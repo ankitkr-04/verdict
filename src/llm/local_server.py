@@ -108,6 +108,13 @@ async def ensure_local_server(local_cfg: dict[str, Any]) -> LocalServer | None:
         "--n-gpu-layers", str(settings.LLAMA_NGL),
         "--no-webui",
     ]
+    # Optional KV-cache quantization + flash-attn for RAM headroom on the 4 GB box.
+    if settings.LLAMA_CACHE_TYPE_K:
+        cmd += ["--cache-type-k", settings.LLAMA_CACHE_TYPE_K]
+    if settings.LLAMA_CACHE_TYPE_V:
+        cmd += ["--cache-type-v", settings.LLAMA_CACHE_TYPE_V]
+    if settings.LLAMA_FLASH_ATTN:
+        cmd += ["--flash-attn", settings.LLAMA_FLASH_ATTN]
     settings.LLAMA_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
     logfile = open(settings.LLAMA_LOG_PATH, "ab")  # noqa: SIM115 — outlives this scope
     proc = subprocess.Popen(cmd, stdout=logfile, stderr=logfile)
